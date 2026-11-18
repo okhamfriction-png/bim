@@ -7,9 +7,9 @@
     android:background="@drawable/bim_widget_bg"
     android:orientation="horizontal"
     android:paddingStart="12dp"
-    android:paddingTop="10dp"
+    android:paddingTop="8dp"
     android:paddingEnd="12dp"
-    android:paddingBottom="10dp"
+    android:paddingBottom="8dp"
     android:weightSum="6">
 
     <LinearLayout
@@ -18,58 +18,67 @@
         android:layout_weight="4"
         android:orientation="vertical">
         <TextView
-            android:id="@+id/left_title"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="@color/bim_widget_ink"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-        <TextView
             android:id="@+id/t1"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:layout_marginTop="5dp"
+            android:layout_marginTop="0dp"
+            android:autoSizeMaxTextSize="22sp"
+            android:autoSizeMinTextSize="15sp"
+            android:autoSizeStepGranularity="1sp"
+            android:autoSizeTextType="uniform"
             android:background="@drawable/bim_w_personnel"
             android:ellipsize="end"
             android:gravity="center_vertical"
             android:maxLines="2"
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp"
-            android:textColor="#FFFFFFFF"
-            android:textSize="16sp"
+            android:paddingStart="12dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="2dp"
+            android:textColor="#FF14161B"
+            android:textSize="20sp"
             android:textStyle="bold" />
         <TextView
             android:id="@+id/t2"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:layout_marginTop="5dp"
+            android:layout_marginTop="6dp"
+            android:autoSizeMaxTextSize="22sp"
+            android:autoSizeMinTextSize="15sp"
+            android:autoSizeStepGranularity="1sp"
+            android:autoSizeTextType="uniform"
             android:background="@drawable/bim_w_personnel"
             android:ellipsize="end"
             android:gravity="center_vertical"
             android:maxLines="2"
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp"
-            android:textColor="#FFFFFFFF"
-            android:textSize="16sp"
+            android:paddingStart="12dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="2dp"
+            android:textColor="#FF14161B"
+            android:textSize="20sp"
             android:textStyle="bold" />
         <TextView
             android:id="@+id/t3"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:layout_marginTop="5dp"
+            android:layout_marginTop="6dp"
+            android:autoSizeMaxTextSize="22sp"
+            android:autoSizeMinTextSize="15sp"
+            android:autoSizeStepGranularity="1sp"
+            android:autoSizeTextType="uniform"
             android:background="@drawable/bim_w_personnel"
             android:ellipsize="end"
             android:gravity="center_vertical"
             android:maxLines="2"
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp"
-            android:textColor="#FFFFFFFF"
-            android:textSize="16sp"
+            android:paddingStart="12dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="2dp"
+            android:textColor="#FF14161B"
+            android:textSize="20sp"
             android:textStyle="bold" />
     </LinearLayout>
 
@@ -92,7 +101,7 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="@color/bim_widget_ink"
-            android:textSize="14sp"
+            android:textSize="16sp"
             android:textStyle="bold" />
         <TextView
             android:id="@+id/week"
@@ -101,7 +110,7 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="@color/bim_widget_sub"
-            android:textSize="13sp"
+            android:textSize="14sp"
             android:textStyle="bold" />
         <TextView
             android:id="@+id/a1"
@@ -111,7 +120,7 @@
             android:maxLines="2"
             android:paddingTop="5dp"
             android:textColor="@color/bim_widget_ink"
-            android:textSize="15sp" />
+            android:textSize="17sp" />
         <TextView
             android:id="@+id/a2"
             android:layout_width="match_parent"
@@ -120,7 +129,7 @@
             android:maxLines="2"
             android:paddingTop="5dp"
             android:textColor="@color/bim_widget_ink"
-            android:textSize="15sp" />
+            android:textSize="17sp" />
         <TextView
             android:id="@+id/a3"
             android:layout_width="match_parent"
@@ -129,6 +138,6 @@
             android:maxLines="2"
             android:paddingTop="5dp"
             android:textColor="@color/bim_widget_ink"
-            android:textSize="15sp" />
+            android:textSize="17sp" />
     </LinearLayout>
 </LinearLayout>

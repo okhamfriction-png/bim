@@ -61,11 +61,6 @@ class BimWidget : AppWidgetProvider() {
 
             // Gauche : les tâches du sprint, par priorité.
             val tasks = data?.optJSONArray("tasks")
-            val count = data?.optInt("count", 0) ?: 0
-            views.setTextViewText(
-                R.id.left_title,
-                if (data == null) "Bim" else if (count == 0) "Sprint : rien à faire" else "Sprint · $count à faire"
-            )
             for (i in taskIds.indices) {
                 val t = tasks?.optJSONObject(i)
                 if (t == null) {
@@ -77,8 +72,8 @@ class BimWidget : AppWidgetProvider() {
                 views.setInt(taskIds[i], "setBackgroundResource", bg)
                 views.setViewVisibility(taskIds[i], View.VISIBLE)
             }
-            if (data == null) {
-                views.setTextViewText(taskIds[0], "Ouvre Bim pour remplir le widget")
+            if (data == null || (tasks?.length() ?: 0) == 0) {
+                views.setTextViewText(taskIds[0], if (data == null) "Ouvre Bim pour remplir le widget" else "✅  Sprint : rien à faire")
                 views.setInt(taskIds[0], "setBackgroundResource", R.drawable.bim_w_parking)
                 views.setViewVisibility(taskIds[0], View.VISIBLE)
             }
@@ -118,6 +113,7 @@ class BimWidget : AppWidgetProvider() {
                 val hour = l.optString("h")
                 val text = SpannableString("$hour  ${l.optString("l")}")
                 text.setSpan(StyleSpan(Typeface.BOLD), 0, hour.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                text.setSpan(ForegroundColorSpan(0xFFF59E0B.toInt()), 0, hour.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                 views.setTextViewText(agendaIds[i], text)
                 views.setViewVisibility(agendaIds[i], View.VISIBLE)
             }
