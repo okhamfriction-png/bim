@@ -29,12 +29,17 @@ class BimWidget : AppWidgetProvider() {
     }
 
     companion object {
-        private val taskIds = intArrayOf(R.id.t1, R.id.t2, R.id.t3, R.id.t4)
-        private val agendaIds = intArrayOf(R.id.a1, R.id.a2, R.id.a3, R.id.a4)
-        private val prioColors = intArrayOf(
-            0xFFEF4444.toInt(), 0xFFF97316.toInt(), 0xFF3B82F6.toInt(),
-            0xFF64748B.toInt(), 0xFF94A3B8.toInt()
-        )
+        private val taskIds = intArrayOf(R.id.t1, R.id.t2, R.id.t3)
+        private val agendaIds = intArrayOf(R.id.a1, R.id.a2, R.id.a3)
+        /** Fond et icône d'une tâche d'après sa catégorie. */
+        private fun look(cat: String, call: Boolean): Pair<Int, String> = when {
+            call -> Pair(R.drawable.bim_w_mission, "📞")
+            cat == "Mission" -> Pair(R.drawable.bim_w_mission, "💼")
+            cat == "Contenu" -> Pair(R.drawable.bim_w_contenu, "🎬")
+            cat == "Destiny" -> Pair(R.drawable.bim_w_destiny, "🎭")
+            cat == "Parking" -> Pair(R.drawable.bim_w_parking, "🅿️")
+            else -> Pair(R.drawable.bim_w_personnel, "📘")
+        }
 
         fun refresh(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
@@ -67,18 +72,14 @@ class BimWidget : AppWidgetProvider() {
                     views.setViewVisibility(taskIds[i], View.GONE)
                     continue
                 }
-                val p = t.optInt("p", 2).coerceIn(0, 4)
-                val text = SpannableString("P$p  ${t.optString("t")}")
-                text.setSpan(ForegroundColorSpan(prioColors[p]), 0, 2, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                text.setSpan(StyleSpan(Typeface.BOLD), 0, 2, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                if (i == 0) {
-                    text.setSpan(StyleSpan(Typeface.BOLD), 4, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                }
-                views.setTextViewText(taskIds[i], text)
+                val (bg, icon) = look(t.optString("c", "Personnel"), t.optBoolean("call", false))
+                views.setTextViewText(taskIds[i], "$icon  ${t.optString("t")}")
+                views.setInt(taskIds[i], "setBackgroundResource", bg)
                 views.setViewVisibility(taskIds[i], View.VISIBLE)
             }
             if (data == null) {
                 views.setTextViewText(taskIds[0], "Ouvre Bim pour remplir le widget")
+                views.setInt(taskIds[0], "setBackgroundResource", R.drawable.bim_w_parking)
                 views.setViewVisibility(taskIds[0], View.VISIBLE)
             }
 

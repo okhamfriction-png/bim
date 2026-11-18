@@ -240,7 +240,7 @@ class Store extends ChangeNotifier {
         'widget',
         jsonEncode({
           'count': q.length,
-          'tasks': [for (final t in q.take(4)) {'p': t.priority, 't': t.title}],
+          'tasks': [for (final t in q.take(4)) {'p': t.priority, 't': t.title, 'c': t.cat, 'call': t.call}],
           'days': days,
         }));
     try {

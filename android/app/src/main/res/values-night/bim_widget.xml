@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="bim_widget_bg">#FF211D1A</color>
-    <color name="bim_widget_ink">#FFF5F0E8</color>
-    <color name="bim_widget_sub">#FFA8A29E</color>
-    <color name="bim_widget_line">#FF342F2A</color>
+    <color name="bim_widget_bg">#FF171A20</color>
+    <color name="bim_widget_ink">#FFF2F3F5</color>
+    <color name="bim_widget_sub">#FF9AA1AE</color>
+    <color name="bim_widget_line">#FF2B303A</color>
 </resources>

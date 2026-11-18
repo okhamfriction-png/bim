@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Tâches du sprint à gauche (4/6), agenda du jour à droite (2/6). -->
+<!-- Tâches du sprint à gauche (4/6) en pastilles de couleur, agenda du jour à droite (2/6). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/bim_widget_bg"
     android:orientation="horizontal"
-    android:paddingStart="14dp"
+    android:paddingStart="12dp"
     android:paddingTop="10dp"
-    android:paddingEnd="14dp"
+    android:paddingEnd="12dp"
     android:paddingBottom="10dp"
     android:weightSum="6">
 
@@ -23,45 +23,54 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="@color/bim_widget_sub"
-            android:textSize="12sp"
+            android:textColor="@color/bim_widget_ink"
+            android:textSize="14sp"
             android:textStyle="bold" />
         <TextView
             android:id="@+id/t1"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="5dp"
+            android:background="@drawable/bim_w_personnel"
             android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="@color/bim_widget_ink"
-            android:textSize="14sp"
-            android:paddingTop="4dp" />
+            android:gravity="center_vertical"
+            android:maxLines="2"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:textColor="#FFFFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold" />
         <TextView
             android:id="@+id/t2"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="5dp"
+            android:background="@drawable/bim_w_personnel"
             android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="@color/bim_widget_ink"
-            android:textSize="14sp"
-            android:paddingTop="4dp" />
+            android:gravity="center_vertical"
+            android:maxLines="2"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:textColor="#FFFFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold" />
         <TextView
             android:id="@+id/t3"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="5dp"
+            android:background="@drawable/bim_w_personnel"
             android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="@color/bim_widget_ink"
-            android:textSize="14sp"
-            android:paddingTop="4dp" />
-        <TextView
-            android:id="@+id/t4"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="@color/bim_widget_ink"
-            android:textSize="14sp"
-            android:paddingTop="4dp" />
+            android:gravity="center_vertical"
+            android:maxLines="2"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:textColor="#FFFFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
     <FrameLayout
@@ -82,8 +91,8 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="@color/bim_widget_sub"
-            android:textSize="12sp"
+            android:textColor="@color/bim_widget_ink"
+            android:textSize="14sp"
             android:textStyle="bold" />
         <TextView
             android:id="@+id/week"
@@ -92,43 +101,34 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="@color/bim_widget_sub"
-            android:textSize="11sp"
+            android:textSize="13sp"
             android:textStyle="bold" />
         <TextView
             android:id="@+id/a1"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:ellipsize="end"
-            android:maxLines="1"
+            android:maxLines="2"
+            android:paddingTop="5dp"
             android:textColor="@color/bim_widget_ink"
-            android:textSize="13sp"
-            android:paddingTop="4dp" />
+            android:textSize="15sp" />
         <TextView
             android:id="@+id/a2"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:ellipsize="end"
-            android:maxLines="1"
+            android:maxLines="2"
+            android:paddingTop="5dp"
             android:textColor="@color/bim_widget_ink"
-            android:textSize="13sp"
-            android:paddingTop="4dp" />
+            android:textSize="15sp" />
         <TextView
             android:id="@+id/a3"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:ellipsize="end"
-            android:maxLines="1"
+            android:maxLines="2"
+            android:paddingTop="5dp"
             android:textColor="@color/bim_widget_ink"
-            android:textSize="13sp"
-            android:paddingTop="4dp" />
-        <TextView
-            android:id="@+id/a4"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="@color/bim_widget_ink"
-            android:textSize="13sp"
-            android:paddingTop="4dp" />
+            android:textSize="15sp" />
     </LinearLayout>
 </LinearLayout>
