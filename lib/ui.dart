@@ -1,7 +1,10 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
+import 'media_io.dart' if (dart.library.js_interop) 'media_web.dart';
 import 'models.dart';
 import 'store.dart';
 
@@ -445,9 +448,13 @@ class TaskBody extends StatelessWidget {
                   : _is(u, ['.png', '.jpg', '.jpeg', '.webp', '.gif'])
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(14),
-                          child: Image.network(u,
-                              errorBuilder: (c, e, s) =>
-                                  Text('Image introuvable', style: TextStyle(color: p.sub))))
+                          child: u.startsWith('media/')
+                              ? PrivateImage(u)
+                              : Image.network(u,
+                                  errorBuilder: (c, e, s) => Text('Image introuvable',
+                                      style: TextStyle(color: p.sub))))
+                      : u.startsWith('media/')
+                          ? Text(u.substring(6), style: TextStyle(color: p.sub))
                       : OutlinedButton.icon(
                           onPressed: () => launchUrl(Uri.parse(u),
                               mode: LaunchMode.externalApplication),
@@ -458,7 +465,31 @@ class TaskBody extends StatelessWidget {
   }
 }
 
+/// Une image privée du dépôt de données.
+class PrivateImage extends StatefulWidget {
+  final String path;
+  const PrivateImage(this.path, {super.key});
+  @override
+  State<PrivateImage> createState() => _PrivateImageState();
+}
+
+class _PrivateImageState extends State<PrivateImage> {
+  late final Future<Uint8List> bytes = store.media(widget.path);
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Uint8List>(
+        future: bytes,
+        builder: (c, s) => s.hasData
+            ? Image.memory(s.data!)
+            : Padding(
+                padding: const EdgeInsets.all(12),
+                child: s.hasError
+                    ? Text('${s.error}', style: TextStyle(color: Pal.of(c).sub))
+                    : const Center(child: CircularProgressIndicator())),
+      );
+}
+
 /// Une vidéo lue dans la tâche. Elle ne se charge qu'au premier toucher.
+/// Une adresse « media/… » désigne un fichier privé du dépôt de données.
 class InlineVideo extends StatefulWidget {
   final String url;
   const InlineVideo(this.url, {super.key});
@@ -469,27 +500,32 @@ class InlineVideo extends StatefulWidget {
 class _InlineVideoState extends State<InlineVideo> {
   VideoPlayerController? c;
   String? error;
+  bool loading = false;
 
   Future<void> toggle() async {
-    if (c == null) {
-      final v = VideoPlayerController.networkUrl(Uri.parse(widget.url));
-      setState(() => c = v);
-      try {
-        await v.initialize();
-      } catch (e) {
-        debugPrint('Bim vidéo : $e');
-        if (mounted) setState(() => error = 'Vidéo illisible');
-        return;
-      }
+    if (loading) return;
+    if (c != null) {
+      c!.value.isPlaying ? c!.pause() : c!.play();
+      return;
+    }
+    setState(() => loading = true);
+    try {
+      final u = widget.url;
+      final v = u.startsWith('media/')
+          ? await privateVideo(u, () => store.media(u))
+          : VideoPlayerController.networkUrl(Uri.parse(u));
+      await v.initialize();
       v.addListener(() {
         if (mounted) setState(() {});
       });
-      if (mounted) setState(() {});
-      // Le navigateur peut refuser la lecture automatique : un second toucher la lance.
-      v.play().catchError((_) {});
-      return;
+      c = v;
+    } catch (e) {
+      debugPrint('Bim vidéo : $e');
+      error = e is String ? e : 'Vidéo illisible';
     }
-    c!.value.isPlaying ? c!.pause() : c!.play();
+    if (mounted) setState(() => loading = false);
+    // Le navigateur peut refuser la lecture automatique : un second toucher la lance.
+    c?.play().catchError((_) {});
   }
 
   @override
@@ -513,8 +549,12 @@ class _InlineVideoState extends State<InlineVideo> {
               const ColoredBox(color: Colors.black, child: SizedBox.expand()),
               if (ready) VideoPlayer(c!),
               if (error != null)
-                Text(error!, style: const TextStyle(color: Colors.white70))
-              else if (c != null && !ready)
+                Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(error!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white70)))
+              else if (loading)
                 const CircularProgressIndicator(color: Colors.white)
               else if (!ready || !c!.value.isPlaying)
                 const Icon(Icons.play_circle_fill, size: 64, color: Colors.white),

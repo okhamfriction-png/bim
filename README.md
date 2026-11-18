@@ -14,8 +14,11 @@ Pour ajouter des tâches depuis un terminal ou une session Claude Code (passe pa
 
 ```bash
 bin/bim add "Valider le montage du vlog" -p 1 -d Contenu --source "Montage vlog rue"
+bin/bim add "Tourner le script du jour" -d Contenu --note-file script.md
+bin/bim add "Valider ce short" -d Contenu --file ~/Movies/short.mp4   # envoyé dans bim-data/media, 95 Mo max
 bin/bim list
 bin/bim done "valider le montage"
+bin/bim rm "valider ce short"
 ```
 
 ## Construire

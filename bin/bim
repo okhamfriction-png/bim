@@ -2,7 +2,8 @@
 """bim — ajoute et consulte les tâches du backlog Bim depuis un terminal ou une session Claude.
 
   bim add "Titre" [-p 1|2|3] [-d Domaine] [--due AAAA-MM-JJ] [--days 1,3,5] [--source …]
-          [--note "descriptif" | --note-file script.md] [--link URL]…
+          [--note "descriptif" | --note-file script.md] [--link URL]… [--file video.mp4]…
+  bim rm <début du titre ou de l'identifiant>
   bim list
   bim done <début du titre ou de l'identifiant>
 
@@ -15,6 +16,7 @@ import datetime
 import json
 import os
 import random
+import re
 import string
 import subprocess
 import sys
@@ -71,6 +73,22 @@ def change(fn, message):
     sys.exit("Conflit de synchro répété, réessaie.")
 
 
+def upload(path, tid):
+    """Envoie une vidéo ou une image dans media/ du dépôt de données ; renvoie son chemin."""
+    size = os.path.getsize(path)
+    if size > 95 * 1024 * 1024:
+        sys.exit(f"{path} fait {size // 1048576} Mo : GitHub refuse au-delà de 100 Mo. Compresse-la d'abord.")
+    name = re.sub(r"[^A-Za-z0-9._-]+", "-", os.path.basename(path)).strip("-")
+    dest = f"media/{tid}-{name}"
+    with open(path, "rb") as f:
+        body = json.dumps({"message": f"bim : fichier {name}",
+                           "content": base64.b64encode(f.read()).decode()})
+    code, out, err = gh("-X", "PUT", f"repos/{repo()}/contents/{dest}", "--input", "-", body=body)
+    if code:
+        sys.exit(f"Envoi de {path} impossible : {err.strip() or out.strip()[:300]}")
+    return dest
+
+
 def now_ms():
     return int(time.time() * 1000)
 
@@ -100,16 +118,21 @@ def cmd_add(a):
         with open(a.note_file, encoding="utf-8") as f:
             note = (note + "\n\n" if note else "") + f.read().strip()
 
+    tid = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
+    links = list(a.link or [])
+    for path in a.file or []:
+        links.append(upload(path, tid))
+
     def fn(doc):
         tasks = doc.setdefault("tasks", [])
         for t in tasks:
             if is_open(t) and t["title"].strip().lower() == a.title.strip().lower():
                 return None
         t = {
-            "id": "".join(random.choices(string.ascii_lowercase + string.digits, k=8)),
+            "id": tid,
             "title": a.title.strip(),
             "note": note,
-            "links": a.link or [],
+            "links": links,
             "domain": a.domain,
             "priority": a.priority,
             "due": a.due,
@@ -171,6 +194,25 @@ def cmd_done(a):
                  else "Plusieurs tâches correspondent :\n" + "\n".join(f"  {t['id']}  {t['title']}" for t in hits))
 
 
+def cmd_rm(a):
+    key = a.key.strip().lower()
+
+    def fn(doc):
+        hits = [t for t in doc.get("tasks", []) if not t.get("deleted")
+                and (t["id"].startswith(key) or t["title"].lower().startswith(key))]
+        if len(hits) == 1:
+            hits[0]["deleted"] = True
+            hits[0]["updatedAt"] = now_ms()
+        return hits
+
+    hits = change(fn, f"bim : - {a.key[:60]}")
+    if len(hits) == 1:
+        print(f"Supprimée : {hits[0]['title']}")
+    else:
+        sys.exit("Aucune tâche trouvée." if not hits
+                 else "Plusieurs tâches correspondent :\n" + "\n".join(f"  {t['id']}  {t['title']}" for t in hits))
+
+
 def main():
     p = argparse.ArgumentParser(prog="bim", description="Backlog Bim")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -183,12 +225,17 @@ def main():
     a.add_argument("--note", default="", help="descriptif affiché quand on déplie la tâche")
     a.add_argument("--note-file", help="fichier texte à mettre en descriptif (script, plan…)")
     a.add_argument("--link", action="append", help="lien, vidéo (.mp4) ou image ; répétable")
+    a.add_argument("--file", "--video", action="append",
+                   help="vidéo ou image du Mac à envoyer avec la tâche (95 Mo max) ; répétable")
     a.add_argument("--source", default="")
     a.set_defaults(fn=cmd_add)
     sub.add_parser("list", help="voir le backlog").set_defaults(fn=cmd_list)
     d = sub.add_parser("done", help="terminer une tâche")
     d.add_argument("key")
     d.set_defaults(fn=cmd_done)
+    r = sub.add_parser("rm", help="supprimer une tâche")
+    r.add_argument("key")
+    r.set_defaults(fn=cmd_rm)
     args = p.parse_args()
     args.fn(args)
 

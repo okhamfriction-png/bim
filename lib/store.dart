@@ -163,6 +163,20 @@ class Store extends ChangeNotifier {
         (t.deleted || (t.status == 'done' && !t.repeats)) && t.updatedAt < old);
   }
 
+  /// Télécharge un fichier privé du dépôt de données (vidéo ou image jointe à une tâche).
+  Future<Uint8List> media(String path) async {
+    if (!linked) throw 'Relie Bim à GitHub (icône nuage) pour voir ce fichier';
+    final r = await http.get(
+        Uri.parse('https://api.github.com/repos/$repo/contents/${Uri.encodeFull(path)}'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/vnd.github.raw',
+          'X-GitHub-Api-Version': '2022-11-28',
+        });
+    if (r.statusCode != 200) throw 'Fichier introuvable (${r.statusCode})';
+    return r.bodyBytes;
+  }
+
   // ---- Synchro GitHub (fichier backlog.json d'un dépôt privé) ----
 
   void _merge(Doc remote) {
