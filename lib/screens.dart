@@ -1008,12 +1008,29 @@ const _blockColors = [
 Color _blockColor(String label) =>
     _blockColors[label.codeUnits.fold<int>(0, (a, b) => a + b) % _blockColors.length];
 
+/// L'icône d'un bloc, d'après son nom.
+IconData _blockIcon(String label) {
+  final l = label.toLowerCase();
+  if (l.contains('sport')) return Icons.fitness_center_rounded;
+  if (l.contains('rue')) return Icons.record_voice_over_rounded;
+  if (l.contains('répét') || l.contains('repet') || l.contains('destiny')) {
+    return Icons.theater_comedy_rounded;
+  }
+  if (l.contains('écri') || l.contains('ecri')) return Icons.edit_rounded;
+  if (l.contains('vidéo') || l.contains('video') || l.contains('montage')) {
+    return Icons.videocam_rounded;
+  }
+  if (l.contains('lecture')) return Icons.menu_book_rounded;
+  return Icons.event_rounded;
+}
+
 /// Grille horaire façon agenda : les jours en colonnes, les heures en lignes,
 /// les blocs en rectangles de couleur placés à leur heure.
 class _TimeGrid extends StatelessWidget {
   final List<DateTime> days;
   final void Function(DateTime) onDay;
-  const _TimeGrid(this.days, {required this.onDay});
+  final double? height; // hauteur disponible : la grille s'y ajuste pour tout montrer
+  const _TimeGrid(this.days, {required this.onDay, this.height});
 
   @override
   Widget build(BuildContext context) {
@@ -1041,14 +1058,18 @@ class _TimeGrid extends StatelessWidget {
       }
     }
     final h0 = lo ~/ 60, h1 = ((hi + 59) ~/ 60).clamp(0, 24);
-    const hh = 46.0;
+    final hh = height == null
+        ? 46.0
+        : ((height! - (wide ? 8 : 60)) / (h1 - h0)).clamp(14.0, 80.0);
+    final step = hh < 20 ? 2 : 1; // heures trop serrées : une étiquette sur deux
     final total = (h1 - h0) * hh;
     double y(int m) => (m - h0 * 60) / 60 * hh;
 
     Widget box(String label, Color color, int start, int end,
         {double alpha = 1, IconData? icon, VoidCallback? onTap}) {
-      final height = (y(end) - y(start) - 2).clamp(18.0, total);
+      final height = (y(end) - y(start) - 2).clamp(16.0, total);
       final size = wide ? 14.5 : 10.5;
+      final tiny = height < 30;
       return Positioned(
         top: y(start) + 1,
         left: 2,
@@ -1057,11 +1078,16 @@ class _TimeGrid extends StatelessWidget {
         child: GestureDetector(
           onTap: onTap,
           child: Container(
-            padding: EdgeInsets.symmetric(horizontal: wide ? 10 : 3, vertical: wide ? 6 : 3),
+            padding: EdgeInsets.symmetric(
+                horizontal: wide ? 10 : 3, vertical: tiny ? 1 : (wide ? 6 : 3)),
             decoration: BoxDecoration(
                 color: color.withValues(alpha: alpha), borderRadius: BorderRadius.circular(7)),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              if (icon != null) Icon(icon, size: wide ? 16 : 12, color: Colors.white),
+              if (icon != null && !tiny)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Icon(icon, size: wide ? 18 : 14, color: Colors.white),
+                ),
               Flexible(
                 child: Text(wide ? '$label  ·  ${hm(start)} – ${hm(end)}' : label,
                     overflow: TextOverflow.fade,
@@ -1080,7 +1106,7 @@ class _TimeGrid extends StatelessWidget {
     return Column(children: [
       if (!wide)
         Padding(
-          padding: const EdgeInsets.only(bottom: 6),
+          padding: EdgeInsets.zero,
           child: Row(children: [
             const SizedBox(width: 38),
             for (final d in days)
@@ -1111,12 +1137,13 @@ class _TimeGrid extends StatelessWidget {
               ),
           ]),
         ),
+      const SizedBox(height: 7),
       Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         SizedBox(
           width: 38,
           height: total,
           child: Stack(clipBehavior: Clip.none, children: [
-            for (var h = h0; h < h1; h++)
+            for (var h = h0; h < h1; h += step)
               Positioned(
                   top: y(h * 60) - 7,
                   right: 6,
@@ -1142,9 +1169,7 @@ class _TimeGrid extends StatelessWidget {
                     final st = s.statusOf(o);
                     return box(o.block.label, _blockColor(o.block.label), o.start, o.end,
                         alpha: st == 'manque' || st == 'hors' ? .4 : 1,
-                        icon: st == 'tenu'
-                            ? Icons.check_circle
-                            : (o.moved ? Icons.swap_horiz_rounded : null),
+                        icon: st == 'tenu' ? Icons.check_circle : _blockIcon(o.block.label),
                         onTap: st == 'attente'
                             ? () => sheet(context, MoveSheet(o, Schedule.mondayOf(d)))
                             : null);
@@ -1230,31 +1255,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
     };
     final body = <Widget>[];
     if (view == 'jour' || view == 'semaine') {
-      body.add(_WeekBadge(cursor));
-      body.add(_TimeGrid(
-          view == 'jour' ? [cursor] : [for (var i = 0; i < 7; i++) _day(monday, i)],
-          onDay: (d) => go('jour', d)));
-      final hints = view == 'semaine'
-          ? {for (var i = 0; i < 7; i++) ...s.hints(_day(monday, i)).map((h) => h.label)}
-          : <String>{};
-      if (hints.isNotEmpty) {
-        body.add(Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Icon(Icons.family_restroom_rounded, size: 16, color: _kids),
-            const SizedBox(width: 8),
-            Expanded(
-                child: Text(hints.join(' · '),
-                    style: TextStyle(color: p.sub, fontSize: 13))),
-          ]),
-        ));
-      }
-      body.add(const SizedBox(height: 16));
-      body.add(OutlinedButton.icon(
-          onPressed: () => openReview(context),
-          style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-          icon: const Icon(Icons.fact_check_rounded),
-          label: const Text('Revue de la semaine')));
+      // construit plus bas, ajusté à la hauteur de la fenêtre
     } else if (view == 'mois') {
       body.add(const _Legend());
       body.add(_MonthGrid(cursor.year, cursor.month, big: true, onDay: (d) => go('jour', d)));
@@ -1291,66 +1292,89 @@ class _AgendaScreenState extends State<AgendaScreen> {
     }
 
     final grid = view == 'jour' || view == 'semaine';
-    return ListView(padding: const EdgeInsets.only(bottom: 40), children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 16, 10),
-        child: Row(children: [
-          Expanded(
-            child: Text('Agenda',
-                style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -.5,
-                    color: p.ink)),
-          ),
-          if (planned > 0 && grid)
-            Pill('Blocs tenus  $held / $planned', _statusColors['tenu']!,
-                icon: Icons.check_circle_rounded),
-        ]),
-      ),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Segmented(agendaViews, view, (v) => setState(() => view = v), expand: true),
-      ),
-      const SizedBox(height: 6),
-      Panel(
-        header: Row(children: [
-          IconButton(
-              tooltip: 'Précédent',
-              visualDensity: VisualDensity.compact,
-              onPressed: () => shift(-1),
-              icon: const Icon(Icons.chevron_left)),
-          Expanded(
-            child: Text(cap(title),
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: p.ink)),
-          ),
-          TextButton(
-              onPressed: () => setState(() => cursor = _day(DateTime.now())),
-              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
-              child: const Text('Aujourd\'hui')),
-          IconButton(
-              tooltip: 'Suivant',
-              visualDensity: VisualDensity.compact,
-              onPressed: () => shift(1),
-              icon: const Icon(Icons.chevron_right)),
-        ]),
-        children: [
-          if (grid) body.first,
-          Padding(
-            padding: EdgeInsets.fromLTRB(grid ? 4 : 14, 14, grid ? 8 : 14, 14),
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: grid ? [body[1]] : body),
-          ),
-        ],
-      ),
-      if (grid)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
-          child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch, children: body.sublist(2)),
+    final top = Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 8, 6),
+      child: Row(children: [
+        Expanded(
+          child: Text('Agenda',
+              style: TextStyle(
+                  fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -.5, color: p.ink)),
         ),
+        if (planned > 0 && grid)
+          Pill('Blocs tenus  $held / $planned', _statusColors['tenu']!,
+              icon: Icons.check_circle_rounded),
+        if (grid)
+          IconButton(
+              tooltip: 'Revue de la semaine',
+              onPressed: () => openReview(context),
+              icon: Icon(Icons.fact_check_rounded, color: p.sub))
+        else
+          const SizedBox(width: 8, height: 48),
+      ]),
+    );
+    final tabs = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Segmented(agendaViews, view, (v) => setState(() => view = v), expand: true),
+    );
+    final nav = Row(children: [
+      IconButton(
+          tooltip: 'Précédent',
+          visualDensity: VisualDensity.compact,
+          onPressed: () => shift(-1),
+          icon: const Icon(Icons.chevron_left)),
+      Expanded(
+        child: Text(cap(title),
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: p.ink)),
+      ),
+      TextButton(
+          onPressed: () => setState(() => cursor = _day(DateTime.now())),
+          style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+          child: const Text('Aujourd\'hui')),
+      IconButton(
+          tooltip: 'Suivant',
+          visualDensity: VisualDensity.compact,
+          onPressed: () => shift(1),
+          icon: const Icon(Icons.chevron_right)),
+    ]);
+
+    // Semaine et jour : vue d'ensemble, tout tient dans la fenêtre.
+    if (grid) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        top,
+        tabs,
+        Expanded(
+          child: Panel(
+            fill: true,
+            margin: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+            header: nav,
+            children: [
+              _WeekBadge(cursor),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 8, 8, 6),
+                child: LayoutBuilder(
+                  builder: (context, box) => _TimeGrid(
+                      view == 'jour' ? [cursor] : [for (var i = 0; i < 7; i++) _day(monday, i)],
+                      height: box.maxHeight,
+                      onDay: (d) => go('jour', d)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ]);
+    }
+
+    return ListView(padding: const EdgeInsets.only(bottom: 40), children: [
+      top,
+      tabs,
+      const SizedBox(height: 6),
+      Panel(header: nav, children: [
+        Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: body),
+        ),
+      ]),
     ]);
   }
 }

@@ -105,8 +105,10 @@ class Panel extends StatelessWidget {
   final List<Widget> children;
   final Color? accent;
   final EdgeInsetsGeometry margin;
+  final bool fill; // la dernière ligne prend toute la hauteur restante
   const Panel(
       {this.header,
+      this.fill = false,
       required this.children,
       this.accent,
       this.margin = const EdgeInsets.fromLTRB(16, 6, 16, 6),
@@ -140,7 +142,7 @@ class Panel extends StatelessWidget {
           ),
         for (var i = 0; i < children.length; i++) ...[
           if (i > 0 || header != null) Container(height: 1, color: p.line),
-          children[i],
+          if (fill && i == children.length - 1) Expanded(child: children[i]) else children[i],
         ],
       ]),
     );
