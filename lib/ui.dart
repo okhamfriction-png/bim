@@ -10,13 +10,16 @@ import 'store.dart';
 
 /// Palette claire et sombre.
 class Pal {
-  final Color bg, card, ink, sub, line, accent, onAccent;
-  const Pal(this.bg, this.card, this.ink, this.sub, this.line, this.accent, this.onAccent);
+  final Color bg, card, ink, sub, line, accent, onAccent, soft;
+  const Pal(this.bg, this.card, this.ink, this.sub, this.line, this.accent, this.onAccent,
+      this.soft);
 
-  static const light = Pal(Color(0xFFFAF6EE), Color(0xFFFFFFFF), Color(0xFF1C1917),
-      Color(0xFF78716C), Color(0xFFE9E1D4), Color(0xFFFFB000), Color(0xFF1C1917));
-  static const dark = Pal(Color(0xFF141210), Color(0xFF211D1A), Color(0xFFF5F0E8),
-      Color(0xFFA8A29E), Color(0xFF342F2A), Color(0xFFFFB627), Color(0xFF1C1917));
+  static const light = Pal(Color(0xFFF2F3F6), Color(0xFFFFFFFF), Color(0xFF14161B),
+      Color(0xFF667085), Color(0xFFDFE2E8), Color(0xFFFFB000), Color(0xFF1C1917),
+      Color(0xFFF7F8FA));
+  static const dark = Pal(Color(0xFF0D0F13), Color(0xFF171A20), Color(0xFFF2F3F5),
+      Color(0xFF9AA1AE), Color(0xFF2B303A), Color(0xFFFFB627), Color(0xFF1C1917),
+      Color(0xFF1E222A));
 
   static Pal of(BuildContext c) =>
       Theme.of(c).brightness == Brightness.dark ? dark : light;
@@ -94,6 +97,200 @@ class Pill extends StatelessWidget {
                   color: Color.lerp(color, Pal.of(context).ink, .35))),
         ]),
       );
+}
+
+/// Une boîte fermée : un en-tête, puis des lignes séparées par un filet.
+class Panel extends StatelessWidget {
+  final Widget? header;
+  final List<Widget> children;
+  final Color? accent;
+  final EdgeInsetsGeometry margin;
+  const Panel(
+      {this.header,
+      required this.children,
+      this.accent,
+      this.margin = const EdgeInsets.fromLTRB(16, 6, 16, 6),
+      super.key});
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      margin: margin,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: p.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: accent ?? p.line, width: accent != null ? 1.5 : 1),
+        boxShadow: dark
+            ? null
+            : [
+                BoxShadow(
+                    color: const Color(0xFF101828).withValues(alpha: .05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2))
+              ],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (header != null)
+          Container(
+            color: accent != null ? Color.alphaBlend(accent!.withValues(alpha: .14), p.card) : p.soft,
+            padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+            child: header,
+          ),
+        for (var i = 0; i < children.length; i++) ...[
+          if (i > 0 || header != null) Container(height: 1, color: p.line),
+          children[i],
+        ],
+      ]),
+    );
+  }
+}
+
+/// En-tête de boîte : icône, titre, sous-titre, compteur, action à droite.
+class PanelHead extends StatelessWidget {
+  final IconData? icon;
+  final Color? color;
+  final String title;
+  final String? subtitle;
+  final String? count;
+  final Widget? trailing;
+  const PanelHead(this.title,
+      {this.icon, this.color, this.subtitle, this.count, this.trailing, super.key});
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    return Row(children: [
+      if (icon != null)
+        Container(
+          width: 30,
+          height: 30,
+          margin: const EdgeInsets.only(right: 10),
+          decoration: BoxDecoration(
+              color: (color ?? p.sub).withValues(alpha: .16),
+              borderRadius: BorderRadius.circular(9)),
+          child: Icon(icon, size: 17, color: color ?? p.sub),
+        ),
+      Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: p.ink)),
+          if (subtitle != null)
+            Text(subtitle!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12.5, color: p.sub)),
+        ]),
+      ),
+      if (count != null) Counter(count!),
+      if (trailing != null) trailing!,
+    ]);
+  }
+}
+
+/// Petit compteur gris.
+class Counter extends StatelessWidget {
+  final String text;
+  const Counter(this.text, {super.key});
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    return Container(
+      margin: const EdgeInsets.only(left: 8, right: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(color: p.line, borderRadius: BorderRadius.circular(99)),
+      child: Text(text,
+          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: p.ink)),
+    );
+  }
+}
+
+/// Étiquette de priorité P0 à P4.
+class PrioChip extends StatelessWidget {
+  final int priority;
+  const PrioChip(this.priority, {super.key});
+  @override
+  Widget build(BuildContext context) {
+    final c = prioColors[priority];
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+          color: c.withValues(alpha: priority == 0 ? 1 : .18),
+          borderRadius: BorderRadius.circular(6)),
+      child: Text(prioNames[priority],
+          style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              color: priority == 0 ? Colors.white : Color.lerp(c, Pal.of(context).ink, .45))),
+    );
+  }
+}
+
+/// Titre de section au-dessus des boîtes.
+class SectionTitle extends StatelessWidget {
+  final String text;
+  final Widget? trailing;
+  const SectionTitle(this.text, {this.trailing, super.key});
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 22, 16, 4),
+        child: Row(children: [
+          Expanded(
+            child: Text(text,
+                style: TextStyle(
+                    fontSize: 12.5,
+                    letterSpacing: .8,
+                    fontWeight: FontWeight.w800,
+                    color: Pal.of(context).sub)),
+          ),
+          if (trailing != null) trailing!,
+        ]),
+      );
+}
+
+/// Sélecteur à segments, dans un seul cadre.
+class Segmented extends StatelessWidget {
+  final Map<String, String> items;
+  final String value;
+  final ValueChanged<String> onChanged;
+  final bool expand;
+  const Segmented(this.items, this.value, this.onChanged, {this.expand = false, super.key});
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    Widget seg(MapEntry<String, String> e) {
+      final on = e.key == value;
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => onChanged(e.key),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: on ? p.card : Colors.transparent,
+            borderRadius: BorderRadius.circular(9),
+            boxShadow: on
+                ? [BoxShadow(color: Colors.black.withValues(alpha: .10), blurRadius: 4, offset: const Offset(0, 1))]
+                : null,
+          ),
+          child: Text(e.value,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 13.5, fontWeight: FontWeight.w800, color: on ? p.ink : p.sub)),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(color: p.line, borderRadius: BorderRadius.circular(12)),
+      child: Row(mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min, children: [
+        for (final e in items.entries) expand ? Expanded(child: seg(e)) : seg(e),
+      ]),
+    );
+  }
 }
 
 class Pick extends StatelessWidget {

@@ -108,6 +108,10 @@ class Store extends ChangeNotifier {
   List<Task> sprintTasks(String s) =>
       backlog.where((t) => !t.parked && sprintOf(t) == s).toList();
 
+  /// Tâches du sprint déjà terminées.
+  int sprintDone(String s) =>
+      tasks.where((t) => !t.deleted && t.status == 'done' && t.sprint == s).length;
+
   /// Crée le prochain sprint qui n'existe pas encore (cette semaine d'abord).
   void createSprint() {
     var m = Schedule.mondayOf(DateTime.now());

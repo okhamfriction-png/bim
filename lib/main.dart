@@ -21,16 +21,37 @@ ThemeData _theme(Pal p, Brightness b) => ThemeData(
         surface: p.card,
         onSurface: p.ink,
       ),
+      filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)))),
+      inputDecorationTheme: InputDecorationTheme(
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: p.line)),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: p.line)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: p.ink, width: 1.5)),
+      ),
+      snackBarTheme: SnackBarThemeData(
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
       textButtonTheme: TextButtonThemeData(
           style: TextButton.styleFrom(
               foregroundColor: p.ink,
               textStyle: const TextStyle(fontWeight: FontWeight.w700))),
       outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
-              foregroundColor: p.ink, side: BorderSide(color: p.line, width: 1.5))),
+              foregroundColor: p.ink,
+              side: BorderSide(color: p.line, width: 1.5),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: p.card,
         indicatorColor: p.accent,
+        iconTheme: WidgetStateProperty.resolveWith((st) => IconThemeData(
+            color: st.contains(WidgetState.selected) ? p.onAccent : p.sub)),
+        height: 66,
+        elevation: 0,
         surfaceTintColor: Colors.transparent,
         labelTextStyle: WidgetStatePropertyAll(
             TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: p.ink)),
@@ -86,7 +107,7 @@ class _ShellState extends State<Shell> {
               constraints: const BoxConstraints(maxWidth: 640),
               child: Column(children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 10, 8, 4),
+                  padding: const EdgeInsets.fromLTRB(20, 10, 8, 6),
                   child: Row(children: [
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
@@ -126,7 +147,9 @@ class _ShellState extends State<Shell> {
             ),
           ),
         ),
-        bottomNavigationBar: NavigationBar(
+        bottomNavigationBar: DecoratedBox(
+          decoration: BoxDecoration(border: Border(top: BorderSide(color: p.line))),
+          child: NavigationBar(
           selectedIndex: tab,
           onDestinationSelected: (i) => setState(() => tab = i),
           destinations: const [
@@ -134,7 +157,7 @@ class _ShellState extends State<Shell> {
             NavigationDestination(icon: Icon(Icons.format_list_bulleted_rounded), label: 'Backlog'),
             NavigationDestination(icon: Icon(Icons.calendar_month_rounded), label: 'Agenda'),
           ],
-        ),
+        )),
       ),
     );
   }

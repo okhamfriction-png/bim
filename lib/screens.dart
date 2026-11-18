@@ -101,7 +101,6 @@ class _NowScreenState extends State<NowScreen> {
     final occs = s.occs(now);
     final cur = occs.where((o) => o.start <= m && m < o.end).firstOrNull;
     final (held, planned) = s.count(Schedule.mondayOf(now));
-    final count = planned == 0 ? '' : 'Blocs tenus : $held / $planned';
     final ask = _cutToAsk(now);
 
     // Ligne d'agenda : le bloc en cours, sinon le prochain.
@@ -120,54 +119,64 @@ class _NowScreenState extends State<NowScreen> {
     final queue = store.queue;
     final t = queue.firstOrNull;
     final rest = queue.skip(1).toList();
-    Widget pad(Widget w) => Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: w);
+    Widget pad(Widget w) => Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: w);
 
     return LayoutBuilder(
-      builder: (context, box) => ListView(padding: const EdgeInsets.only(top: 4, bottom: 24), children: [
-        pad(Row(children: [
-          Expanded(
-              child: Text(longDate(now),
-                  style: TextStyle(color: p.sub, fontWeight: FontWeight.w600))),
-          Text(count, style: TextStyle(color: p.sub, fontSize: 13.5)),
-        ])),
-        if (agenda.isNotEmpty)
-          pad(Padding(
-            padding: const EdgeInsets.only(top: 6),
+      builder: (context, box) => ListView(padding: const EdgeInsets.only(bottom: 28), children: [
+        // Où j'en suis : la date, le compte des blocs, la ligne d'agenda.
+        Panel(margin: const EdgeInsets.fromLTRB(16, 2, 16, 6), children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 11, 12, 11),
             child: Row(children: [
-              Icon(cur != null ? Icons.lock_clock_rounded : Icons.schedule,
-                  size: 18, color: cur != null ? _statusColors[st] : p.sub),
-              const SizedBox(width: 8),
               Expanded(
-                  child: Text(agenda,
-                      style: TextStyle(fontWeight: FontWeight.w700, color: p.ink))),
-              if (st == 'ouvert')
-                FilledButton(
-                    onPressed: () {
-                      HapticFeedback.mediumImpact();
-                      store.check(cur!);
-                    },
-                    style: FilledButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 16)),
-                    child: const Text('J\'y suis',
-                        style: TextStyle(fontWeight: FontWeight.w900)))
-              else if (st == 'tenu' || st == 'manque')
-                Pill(_statusNames[st]!, _statusColors[st]!),
+                  child: Text(longDate(now),
+                      style: TextStyle(
+                          fontSize: 15.5, fontWeight: FontWeight.w800, color: p.ink))),
+              if (planned > 0)
+                Pill('Blocs tenus  $held / $planned', _statusColors['tenu']!,
+                    icon: Icons.check_circle_rounded),
             ]),
-          )),
+          ),
+          if (agenda.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 9, 10, 9),
+              child: Row(children: [
+                Icon(cur != null ? Icons.lock_clock_rounded : Icons.schedule,
+                    size: 19, color: cur != null ? _statusColors[st] : p.sub),
+                const SizedBox(width: 9),
+                Expanded(
+                    child: Text(agenda,
+                        style: TextStyle(
+                            fontSize: 14.5, fontWeight: FontWeight.w600, color: p.ink))),
+                if (st == 'ouvert')
+                  FilledButton(
+                      onPressed: () {
+                        HapticFeedback.mediumImpact();
+                        store.check(cur!);
+                      },
+                      style: FilledButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 16)),
+                      child: const Text('J\'y suis',
+                          style: TextStyle(fontWeight: FontWeight.w900)))
+                else if (st == 'tenu' || st == 'manque')
+                  Pill(_statusNames[st]!, _statusColors[st]!),
+              ]),
+            ),
+        ]),
         if (ask != null) pad(_CutAsk(ask)),
         if (review)
           pad(Padding(
-            padding: const EdgeInsets.only(top: 12),
+            padding: const EdgeInsets.only(top: 8),
             child: FilledButton.icon(
                 onPressed: () => openReview(context),
                 icon: const Icon(Icons.fact_check_rounded),
                 label: const Text('Faire la revue de la semaine',
                     style: TextStyle(fontWeight: FontWeight.w800))),
           )),
-        const SizedBox(height: 14),
+        const SizedBox(height: 8),
         pad(SizedBox(
-          height: (box.maxHeight * .46).clamp(240.0, 440.0),
+          height: (box.maxHeight * .58).clamp(320.0, 540.0),
           child: Stack(alignment: Alignment.center, children: [
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 350),
@@ -177,7 +186,7 @@ class _NowScreenState extends State<NowScreen> {
                       position: Tween(begin: const Offset(0, .08), end: Offset.zero).animate(a),
                       child: c)),
               child: t != null
-                  ? _Card(key: ValueKey(t.id), task: t)
+                  ? _Card(key: ValueKey(t.id), task: t, onDone: () => done(t))
                   : const _Empty(key: ValueKey('vide')),
             ),
             IgnorePointer(
@@ -201,78 +210,78 @@ class _NowScreenState extends State<NowScreen> {
             ),
           ]),
         )),
-        if (t != null) ...[
-          const SizedBox(height: 12),
-          pad(SizedBox(
-            height: 64,
-            child: FilledButton.icon(
-              onPressed: () => done(t),
-              icon: const Icon(Icons.check_rounded, size: 30),
-              label: const Text('Terminé',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-              style: FilledButton.styleFrom(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22))),
-            ),
-          )),
-          pad(Align(
-            alignment: Alignment.center,
-            child: TextButton.icon(
-                onPressed: () => sheet(context, TaskSheet(task: t)),
-                icon: const Icon(Icons.edit_outlined, size: 18),
-                label: const Text('Modifier')),
-          )),
-        ],
         if (rest.isNotEmpty)
-          pad(Padding(
-            padding: const EdgeInsets.only(top: 8, bottom: 6),
-            child: Text('ENSUITE DANS LE SPRINT · ${rest.length}',
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: p.sub)),
-          )),
-        for (final x in rest) _Tile(x, key: ValueKey(x.id)),
+          Panel(
+            margin: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+            header: PanelHead('Ensuite dans le sprint',
+                icon: Icons.flag_rounded, color: p.accent, count: '${rest.length}'),
+            children: [for (final x in rest) _Tile(x, key: ValueKey(x.id))],
+          ),
       ]),
     );
   }
 }
 
+/// La tâche en cours : une carte fermée, étiquettes en haut, « Terminé » en bas.
 class _Card extends StatelessWidget {
   final Task task;
-  const _Card({required this.task, super.key});
+  final VoidCallback onDone;
+  const _Card({required this.task, required this.onDone, super.key});
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final t = task;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: p.card,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: p.line),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: .06),
-              blurRadius: 30,
-              offset: const Offset(0, 12))
-        ],
+        boxShadow: dark
+            ? null
+            : [
+                BoxShadow(
+                    color: const Color(0xFF101828).withValues(alpha: .10),
+                    blurRadius: 28,
+                    offset: const Offset(0, 10))
+              ],
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Wrap(spacing: 8, runSpacing: 8, children: [
-          Pill(prioNames[t.priority], prioColors[t.priority]),
-          Pill(t.cat, domainOf(t.cat), icon: iconOf(t.cat)),
-          if (t.call)
-            Pill('Appel', prioColors[1], icon: Icons.phone_in_talk_rounded),
-        ]),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Container(height: 5, color: prioColors[t.priority]),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 6, 0),
+          child: Row(children: [
+            Expanded(
+              child: Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    PrioChip(t.priority),
+                    Pill(t.cat, domainOf(t.cat), icon: iconOf(t.cat)),
+                    if (t.call) Pill('Appel', prioColors[1], icon: Icons.phone_in_talk_rounded),
+                  ]),
+            ),
+            IconButton(
+                tooltip: 'Modifier',
+                onPressed: () => sheet(context, TaskSheet(task: t)),
+                icon: Icon(Icons.edit_outlined, size: 21, color: p.sub)),
+          ]),
+        ),
         Expanded(
           child: Center(
             child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
               child: Column(children: [
                 Text(t.title,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                        fontSize: t.title.length > 60 ? 26 : 34,
+                        fontSize: t.title.length > 60 ? 24 : 31,
                         height: 1.15,
                         fontWeight: FontWeight.w900,
-                        letterSpacing: -.5,
+                        letterSpacing: -.6,
                         color: p.ink)),
                 if (t.note.isNotEmpty || t.links.isNotEmpty)
                   Padding(
@@ -280,13 +289,31 @@ class _Card extends StatelessWidget {
                     child: TaskBody(t,
                         align: t.note.length > 160 ? TextAlign.start : TextAlign.center),
                   ),
+                if (t.source.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text('via ${t.source}',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: p.sub, fontSize: 13)),
+                  ),
               ]),
             ),
           ),
         ),
-        if (t.source.isNotEmpty)
-          Text('via ${t.source}',
-              overflow: TextOverflow.ellipsis, style: TextStyle(color: p.sub, fontSize: 13)),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 6, 14, 14),
+          child: SizedBox(
+            height: 58,
+            child: FilledButton.icon(
+              onPressed: onDone,
+              icon: const Icon(Icons.check_rounded, size: 28),
+              label: const Text('Terminé',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+              style: FilledButton.styleFrom(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+            ),
+          ),
+        ),
       ]),
     );
   }
@@ -298,13 +325,25 @@ class _Empty extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final none = !store.sprints.contains(store.thisMonday);
-    return Center(
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Icon(Icons.wb_sunny_rounded, size: 56, color: p.accent),
-        const SizedBox(height: 12),
-        Text(none ? 'Pas de sprint cette semaine.' : 'Sprint vide.',
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+          color: p.card,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: p.line)),
+      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Container(
+          width: 72,
+          height: 72,
+          decoration: BoxDecoration(
+              color: p.accent.withValues(alpha: .18), shape: BoxShape.circle),
+          child: Icon(Icons.flag_rounded, size: 36, color: p.accent),
+        ),
+        const SizedBox(height: 16),
+        Text(none ? 'Pas de sprint cette semaine' : 'Sprint vide',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: p.ink)),
+            style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900, color: p.ink)),
         const SizedBox(height: 6),
         Text(
             none
@@ -340,115 +379,138 @@ class _BacklogScreenState extends State<BacklogScreen> {
     focus.requestFocus();
   }
 
+  Widget sprintBox(BuildContext context, String sp) {
+    final p = Pal.of(context);
+    final current = sp == store.thisMonday;
+    final open = store.sprintTasks(sp);
+    final done = store.sprintDone(sp);
+    final total = open.length + done;
+    return Panel(
+      accent: current ? p.accent : null,
+      header: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        PanelHead(
+          current ? 'Sprint en cours' : 'Sprint à venir',
+          icon: Icons.flag_rounded,
+          color: current ? Color.lerp(p.accent, p.ink, .25) : p.sub,
+          subtitle: cap(_range(dateOf(sp))),
+          count: total == 0 ? '0' : '$done / $total',
+        ),
+        if (total > 0)
+          Padding(
+            padding: const EdgeInsets.only(top: 9, right: 4),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(99),
+              child: LinearProgressIndicator(
+                  value: done / total,
+                  minHeight: 5,
+                  backgroundColor: p.line,
+                  color: _statusColors['tenu']),
+            ),
+          ),
+      ]),
+      children: [
+        if (open.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+            child: Row(children: [
+              Icon(total > 0 ? Icons.celebration_rounded : Icons.inbox_rounded,
+                  color: p.sub, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                    total > 0
+                        ? 'Tout est fait dans ce sprint.'
+                        : 'Vide. Déplie une tâche du backlog et touche « Sprint ».',
+                    style: TextStyle(color: p.sub)),
+              ),
+            ]),
+          ),
+        for (final t in open) _Tile(t, key: ValueKey(t.id)),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final all = store.backlog;
     final done = store.doneToday;
+    final todo = all.where((t) => !t.parked).length;
 
     final header = Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('${all.where((t) => !t.parked).length} à faire',
-            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: p.ink)),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.only(left: 14),
-          decoration: BoxDecoration(
-              color: p.card,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: p.line, width: 1.5)),
-          child: Row(children: [
-            Expanded(
-              child: TextField(
-                controller: quick,
-                focusNode: focus,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(
-                    hintText: 'Ajouter une tâche',
-                    border: InputBorder.none,
-                    hintStyle: TextStyle(color: p.sub)),
-                onSubmitted: (_) => add(),
-              ),
-            ),
-            PopupMenuButton<int>(
-              tooltip: 'Priorité : ${prioNames[addPrio]}',
-              initialValue: addPrio,
-              onSelected: (v) => setState(() => addPrio = v),
-              itemBuilder: (_) => [
-                for (var i = 0; i <= 4; i++)
-                  PopupMenuItem(
-                      value: i,
-                      child: Text(prioNames[i],
-                          style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              color: Color.lerp(prioColors[i], p.ink, .25)))),
-              ],
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-                child: Text(prioNames[addPrio],
-                    style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        color: Color.lerp(prioColors[addPrio], p.ink, .25))),
-              ),
-            ),
-            PopupMenuButton<String>(
-              tooltip: 'Catégorie : $addCat',
-              initialValue: addCat,
-              onSelected: (c) => setState(() => addCat = c),
-              itemBuilder: (_) => [
-                for (final c in cats)
-                  PopupMenuItem(
-                      value: c,
-                      child: Row(children: [
-                        Icon(iconOf(c), color: domainOf(c), size: 20),
-                        const SizedBox(width: 10),
-                        Text(c),
-                      ])),
-              ],
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(iconOf(addCat), color: domainOf(addCat), size: 22),
-                  Icon(Icons.arrow_drop_down, color: p.sub),
-                ]),
-              ),
-            ),
-          ]),
+      padding: const EdgeInsets.fromLTRB(20, 0, 16, 8),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+        Text('Backlog',
+            style: TextStyle(
+                fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -.5, color: p.ink)),
+        const SizedBox(width: 10),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 5),
+          child: Text('$todo à faire', style: TextStyle(color: p.sub, fontSize: 14.5)),
         ),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-            onPressed: store.createSprint,
-            icon: const Icon(Icons.flag_rounded, size: 18),
-            label: const Text('Créer un sprint d\'une semaine')),
       ]),
     );
 
-    final toggle = Padding(
-      padding: const EdgeInsets.fromLTRB(20, 26, 20, 0),
+    final adder = Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+      padding: const EdgeInsets.only(left: 12),
+      decoration: BoxDecoration(
+          color: p.card,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: p.line, width: 1.5)),
       child: Row(children: [
+        Icon(Icons.add_rounded, color: p.sub),
+        const SizedBox(width: 6),
         Expanded(
-            child: Text('BACKLOG',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: p.ink))),
-        Pick('Catégorie', group == 'cat', () => setState(() => group = 'cat'),
-            icon: Icons.category_rounded),
-        const SizedBox(width: 8),
-        Pick('Origine', group == 'source', () => setState(() => group = 'source'),
-            icon: Icons.forum_rounded),
+          child: TextField(
+            controller: quick,
+            focusNode: focus,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: InputDecoration(
+                hintText: 'Ajouter une tâche',
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                hintStyle: TextStyle(color: p.sub)),
+            onSubmitted: (_) => add(),
+          ),
+        ),
+        PopupMenuButton<int>(
+          tooltip: 'Priorité : ${prioNames[addPrio]}',
+          initialValue: addPrio,
+          onSelected: (v) => setState(() => addPrio = v),
+          itemBuilder: (_) => [
+            for (var i = 0; i <= 4; i++) PopupMenuItem(value: i, child: PrioChip(i)),
+          ],
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+            child: PrioChip(addPrio),
+          ),
+        ),
+        PopupMenuButton<String>(
+          tooltip: 'Catégorie : $addCat',
+          initialValue: addCat,
+          onSelected: (c) => setState(() => addCat = c),
+          itemBuilder: (_) => [
+            for (final c in cats)
+              PopupMenuItem(
+                  value: c,
+                  child: Row(children: [
+                    Icon(iconOf(c), color: domainOf(c), size: 20),
+                    const SizedBox(width: 10),
+                    Text(c),
+                  ])),
+          ],
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(6, 10, 6, 10),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(iconOf(addCat), color: domainOf(addCat), size: 22),
+              Icon(Icons.arrow_drop_down, color: p.sub),
+            ]),
+          ),
+        ),
       ]),
     );
-
-    Widget section(String title, {IconData? icon, Color? color}) => Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 6),
-          child: Row(children: [
-            if (icon != null)
-              Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Icon(icon, size: 18, color: color ?? p.sub)),
-            Text(title,
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: p.sub)),
-          ]),
-        );
 
     const mine = 'Ajoutées par moi';
     final loose = all.where((t) => t.parked || store.sprintOf(t) == null).toList();
@@ -466,37 +528,63 @@ class _BacklogScreenState extends State<BacklogScreen> {
 
     return ListView(children: [
       header,
-      for (final sp in store.sprints) ...[
-        section(
-            '${sp == store.thisMonday ? 'SPRINT EN COURS' : 'SPRINT'} · '
-            '${_range(dateOf(sp)).toUpperCase()} · ${store.sprintTasks(sp).length}',
-            icon: Icons.flag_rounded,
-            color: sp == store.thisMonday ? p.accent : null),
-        if (store.sprintTasks(sp).isEmpty)
+      adder,
+      SectionTitle('SPRINTS',
+          trailing: TextButton.icon(
+              onPressed: store.createSprint,
+              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Nouveau sprint'))),
+      if (store.sprints.isEmpty)
+        Panel(children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
-            child: Text('Vide. Déplie une tâche du backlog et touche « Sprint ».',
-                style: TextStyle(color: p.sub)),
+            padding: const EdgeInsets.all(18),
+            child: Column(children: [
+              Icon(Icons.flag_outlined, size: 30, color: p.sub),
+              const SizedBox(height: 8),
+              Text('Aucun sprint. Un sprint dure une semaine, du lundi au dimanche.',
+                  textAlign: TextAlign.center, style: TextStyle(color: p.sub)),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                  onPressed: store.createSprint,
+                  icon: const Icon(Icons.flag_rounded, size: 18),
+                  label: const Text('Créer le sprint de cette semaine',
+                      style: TextStyle(fontWeight: FontWeight.w800))),
+            ]),
           ),
-        for (final t in store.sprintTasks(sp)) _Tile(t, key: ValueKey(t.id)),
-      ],
-      toggle,
+        ]),
+      for (final sp in store.sprints) sprintBox(context, sp),
+      SectionTitle('HORS SPRINT',
+          trailing: Segmented(const {'cat': 'Catégorie', 'source': 'Origine'}, group,
+              (v) => setState(() => group = v))),
       if (loose.isEmpty)
-        Padding(
-          padding: const EdgeInsets.all(30),
-          child: Text('Rien hors sprint.',
-              textAlign: TextAlign.center, style: TextStyle(color: p.sub)),
+        Panel(children: [
+          Padding(
+            padding: const EdgeInsets.all(22),
+            child: Text('Rien hors sprint.',
+                textAlign: TextAlign.center, style: TextStyle(color: p.sub)),
+          ),
+        ]),
+      for (final g in groups.entries)
+        Panel(
+          header: PanelHead(g.key,
+              icon: group == 'cat'
+                  ? iconOf(g.key)
+                  : (g.key == mine ? Icons.person_rounded : Icons.forum_rounded),
+              color: group == 'cat' ? domainOf(g.key) : null,
+              count: '${g.value.length}'),
+          children: [for (final t in g.value) _Tile(t, key: ValueKey(t.id))],
         ),
-      for (final g in groups.entries) ...[
-        section('${g.key.toUpperCase()} · ${g.value.length}',
-            icon: group == 'cat'
-                ? iconOf(g.key)
-                : (g.key == mine ? Icons.person_rounded : Icons.forum_rounded),
-            color: group == 'cat' ? domainOf(g.key) : null),
-        for (final t in g.value) _Tile(t, key: ValueKey(t.id)),
+      if (done.isNotEmpty) ...[
+        const SectionTitle('TERMINÉ'),
+        Panel(
+          header: PanelHead('Fait aujourd\'hui',
+              icon: Icons.check_circle_rounded,
+              color: _statusColors['tenu'],
+              count: '${done.length}'),
+          children: [for (final t in done) _Tile(t, key: ValueKey('d${t.id}'))],
+        ),
       ],
-      if (done.isNotEmpty) section('FAIT AUJOURD\'HUI'),
-      for (final t in done) _Tile(t, key: ValueKey('d${t.id}')),
       const SizedBox(height: 40),
     ]);
   }
@@ -538,7 +626,8 @@ class SprintSheet extends StatelessWidget {
   }
 }
 
-/// Une tâche dans la liste : icône et couleur de la catégorie, se déplie au toucher.
+/// Une ligne de tâche dans une boîte : icône et couleur de la catégorie,
+/// priorité à droite, se déplie au toucher.
 class _Tile extends StatefulWidget {
   final Task t;
   const _Tile(this.t, {super.key});
@@ -561,139 +650,123 @@ class _TileState extends State<_Tile> {
       if (t.pickedToday && !struck) 'aujourd\'hui',
       t.source.isNotEmpty ? 'via ${t.source}' : t.cat,
     ].join(' · ');
-    return Opacity(
-      opacity: dim && !open ? .6 : 1,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-        decoration: BoxDecoration(
-            color: p.card,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: open ? color : p.line)),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(children: [
-          Positioned(
-              left: 0,
-              top: 0,
-              bottom: 0,
-              width: 6,
-              child: ColoredBox(color: prioColors[t.priority])),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOut,
-            alignment: Alignment.topCenter,
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              InkWell(
-                onTap: () => setState(() => open = !open),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 10, 6, 10),
-                  child: Row(children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                          color: color.withValues(alpha: .18), shape: BoxShape.circle),
-                      child: Icon(t.call ? Icons.phone_in_talk_rounded : iconOf(t.cat),
-                          color: color, size: 21),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(t.title,
-                            style: TextStyle(
-                                fontSize: 16.5,
-                                fontWeight: FontWeight.w700,
-                                color: p.ink,
-                                decoration: struck ? TextDecoration.lineThrough : null)),
-                        const SizedBox(height: 3),
-                        Row(children: [
-                          Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: Text(prioNames[t.priority],
-                                style: TextStyle(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.w900,
-                                    color: Color.lerp(prioColors[t.priority], p.ink, .25))),
-                          ),
-                          if (t.pickedToday && !struck)
-                            Padding(
-                                padding: const EdgeInsets.only(right: 5),
-                                child: Icon(Icons.today_rounded, size: 15, color: p.accent)),
-                          if (t.note.isNotEmpty)
-                            Padding(
-                                padding: const EdgeInsets.only(right: 5),
-                                child: Icon(Icons.notes_rounded, size: 15, color: p.sub)),
-                          if (t.links.isNotEmpty)
-                            Padding(
-                                padding: const EdgeInsets.only(right: 5),
-                                child: Icon(Icons.play_circle_outline, size: 15, color: p.sub)),
-                          Expanded(
-                            child: Text(meta,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontSize: 13, color: p.sub)),
-                          ),
-                        ]),
-                      ]),
-                    ),
-                    IconButton(
-                      tooltip: struck ? 'Remettre à faire' : 'Terminé',
-                      onPressed: struck
-                          ? () => store.reopen(t)
-                          : () {
-                              HapticFeedback.lightImpact();
-                              store.complete(t);
-                            },
-                      icon: Icon(struck ? Icons.check_circle : Icons.circle_outlined,
-                          color: struck ? p.accent : p.sub, size: 28),
-                    ),
-                  ]),
+    Widget action(String label, IconData icon, VoidCallback? onTap) => OutlinedButton.icon(
+        onPressed: onTap,
+        style: OutlinedButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            backgroundColor: p.card,
+            side: BorderSide(color: p.line),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            textStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
+        icon: Icon(icon, size: 17),
+        label: Text(label));
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOut,
+      alignment: Alignment.topCenter,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        InkWell(
+          onTap: () => setState(() => open = !open),
+          child: Opacity(
+            opacity: dim && !open ? .55 : 1,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 9, 2, 9),
+              child: Row(children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                      color: color.withValues(alpha: .16),
+                      borderRadius: BorderRadius.circular(10)),
+                  child: Icon(t.call ? Icons.phone_in_talk_rounded : iconOf(t.cat),
+                      color: color, size: 19),
                 ),
-              ),
-              if (open)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(22, 2, 16, 8),
+                const SizedBox(width: 12),
+                Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    if (t.note.isEmpty && t.links.isEmpty)
-                      Text('Pas de descriptif.', style: TextStyle(color: p.sub))
-                    else
-                      TaskBody(t),
-                    const SizedBox(height: 8),
-                    Wrap(
-                        alignment: WrapAlignment.end,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: 4,
-                        children: [
-                          if (t.open && !t.parked && !t.call)
-                            TextButton.icon(
-                                onPressed: t.pickedToday
-                                    ? () => store.unpick(t)
-                                    : (store.canPick ? () => store.pick(t) : null),
-                                icon: Icon(
-                                    t.pickedToday
-                                        ? Icons.remove_circle_outline
-                                        : Icons.today_rounded,
-                                    size: 18),
-                                label: Text(t.pickedToday
-                                    ? 'Retirer du jour'
-                                    : (store.canPick ? 'Pour aujourd\'hui' : 'Déjà 3 aujourd\'hui'))),
-                          if (t.open && !t.parked)
-                            TextButton.icon(
-                                onPressed: () => sheet(context, SprintSheet(t)),
-                                icon: const Icon(Icons.flag_rounded, size: 18),
-                                label: Text(store.sprintOf(t) == null
-                                    ? 'Sprint'
-                                    : 'Sprint ${_range(dateOf(store.sprintOf(t)!))}')),
-                          TextButton.icon(
-                              onPressed: () => sheet(context, TaskSheet(task: t)),
-                              icon: const Icon(Icons.edit_outlined, size: 18),
-                              label: const Text('Modifier')),
-                        ]),
+                    Text(t.title,
+                        maxLines: open ? null : 2,
+                        overflow: open ? null : TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 15.5,
+                            height: 1.25,
+                            fontWeight: FontWeight.w700,
+                            color: p.ink,
+                            decoration: struck ? TextDecoration.lineThrough : null)),
+                    const SizedBox(height: 3),
+                    Row(children: [
+                      if (t.pickedToday && !struck)
+                        Padding(
+                            padding: const EdgeInsets.only(right: 5),
+                            child: Icon(Icons.today_rounded, size: 14, color: p.accent)),
+                      if (t.note.isNotEmpty)
+                        Padding(
+                            padding: const EdgeInsets.only(right: 5),
+                            child: Icon(Icons.notes_rounded, size: 14, color: p.sub)),
+                      if (t.links.isNotEmpty)
+                        Padding(
+                            padding: const EdgeInsets.only(right: 5),
+                            child: Icon(Icons.play_circle_outline, size: 14, color: p.sub)),
+                      Expanded(
+                        child: Text(meta,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 12.5, color: p.sub)),
+                      ),
+                    ]),
                   ]),
                 ),
+                const SizedBox(width: 8),
+                PrioChip(t.priority),
+                IconButton(
+                  tooltip: struck ? 'Remettre à faire' : 'Terminé',
+                  onPressed: struck
+                      ? () => store.reopen(t)
+                      : () {
+                          HapticFeedback.lightImpact();
+                          store.complete(t);
+                        },
+                  icon: Icon(struck ? Icons.check_circle : Icons.circle_outlined,
+                      color: struck ? _statusColors['tenu'] : p.sub, size: 26),
+                ),
+              ]),
+            ),
+          ),
+        ),
+        if (open)
+          Container(
+            decoration: BoxDecoration(
+                color: p.soft, border: Border(top: BorderSide(color: p.line))),
+            padding: const EdgeInsets.fromLTRB(16, 12, 14, 12),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              if (t.note.isEmpty && t.links.isEmpty)
+                Text('Pas de descriptif.', style: TextStyle(color: p.sub))
+              else
+                TaskBody(t),
+              const SizedBox(height: 12),
+              Wrap(spacing: 8, runSpacing: 4, children: [
+                if (t.open && !t.parked && !t.call)
+                  action(
+                      t.pickedToday
+                          ? 'Retirer du jour'
+                          : (store.canPick ? 'Pour aujourd\'hui' : 'Déjà 3 aujourd\'hui'),
+                      t.pickedToday ? Icons.remove_circle_outline : Icons.today_rounded,
+                      t.pickedToday
+                          ? () => store.unpick(t)
+                          : (store.canPick ? () => store.pick(t) : null)),
+                if (t.open && !t.parked)
+                  action(
+                      store.sprintOf(t) == null
+                          ? 'Sprint'
+                          : 'Sprint ${_range(dateOf(store.sprintOf(t)!))}',
+                      Icons.flag_rounded,
+                      () => sheet(context, SprintSheet(t))),
+                action('Modifier', Icons.edit_outlined,
+                    () => sheet(context, TaskSheet(task: t))),
+              ]),
             ]),
           ),
-        ]),
-      ),
+      ]),
     );
   }
 }
@@ -754,12 +827,8 @@ class _WeekBadge extends StatelessWidget {
     final w = store.schedule.weekOf(day);
     final c = _weekColor(w);
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-      decoration: BoxDecoration(
-          color: c.withValues(alpha: .16),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: c, width: 1.5)),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      color: Color.alphaBlend(c.withValues(alpha: .16), p.card),
       child: Row(children: [
         Icon(_isKids(w) ? Icons.family_restroom_rounded : Icons.person_rounded, color: c),
         const SizedBox(width: 10),
@@ -768,7 +837,6 @@ class _WeekBadge extends StatelessWidget {
               style: TextStyle(
                   fontSize: 16.5, fontWeight: FontWeight.w900, color: Color.lerp(c, p.ink, .45))),
         ),
-        Text(_range(Schedule.mondayOf(day)), style: TextStyle(color: p.sub, fontSize: 13)),
       ]),
     );
   }
@@ -1177,56 +1245,67 @@ class _AgendaScreenState extends State<AgendaScreen> {
       }
     }
 
-    return ListView(padding: const EdgeInsets.fromLTRB(20, 0, 20, 40), children: [
-      Row(children: [
-        Expanded(
-          child: Text('Agenda',
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: p.ink)),
-        ),
-        if (planned > 0 && (view == 'jour' || view == 'semaine'))
-          Pill('Blocs tenus : $held / $planned', _statusColors['tenu']!,
-              icon: Icons.check_circle_rounded),
-      ]),
-      const SizedBox(height: 10),
-      Row(children: [
-        for (final v in agendaViews.entries)
+    final grid = view == 'jour' || view == 'semaine';
+    return ListView(padding: const EdgeInsets.only(bottom: 40), children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 16, 10),
+        child: Row(children: [
           Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => view = v.key),
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 2),
-                padding: const EdgeInsets.symmetric(vertical: 9),
-                decoration: BoxDecoration(
-                    color: view == v.key ? p.ink : Colors.transparent,
-                    borderRadius: BorderRadius.circular(99),
-                    border: Border.all(color: view == v.key ? p.ink : p.line, width: 1.5)),
-                child: Text(v.value,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 13.5,
-                        color: view == v.key ? p.bg : p.ink)),
-              ),
-            ),
+            child: Text('Agenda',
+                style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -.5,
+                    color: p.ink)),
           ),
-      ]),
-      const SizedBox(height: 4),
-      Row(children: [
-        IconButton(
-            tooltip: 'Précédent', onPressed: () => shift(-1), icon: const Icon(Icons.chevron_left)),
-        Expanded(
-          child: GestureDetector(
-            onTap: () => setState(() => cursor = _day(DateTime.now())),
-            child: Text(title,
+          if (planned > 0 && grid)
+            Pill('Blocs tenus  $held / $planned', _statusColors['tenu']!,
+                icon: Icons.check_circle_rounded),
+        ]),
+      ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Segmented(agendaViews, view, (v) => setState(() => view = v), expand: true),
+      ),
+      const SizedBox(height: 6),
+      Panel(
+        header: Row(children: [
+          IconButton(
+              tooltip: 'Précédent',
+              visualDensity: VisualDensity.compact,
+              onPressed: () => shift(-1),
+              icon: const Icon(Icons.chevron_left)),
+          Expanded(
+            child: Text(cap(title),
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: p.ink)),
           ),
+          TextButton(
+              onPressed: () => setState(() => cursor = _day(DateTime.now())),
+              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+              child: const Text('Aujourd\'hui')),
+          IconButton(
+              tooltip: 'Suivant',
+              visualDensity: VisualDensity.compact,
+              onPressed: () => shift(1),
+              icon: const Icon(Icons.chevron_right)),
+        ]),
+        children: [
+          if (grid) body.first,
+          Padding(
+            padding: EdgeInsets.fromLTRB(grid ? 4 : 14, 14, grid ? 8 : 14, 14),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: grid ? [body[1]] : body),
+          ),
+        ],
+      ),
+      if (grid)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+          child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch, children: body.sublist(2)),
         ),
-        IconButton(
-            tooltip: 'Suivant', onPressed: () => shift(1), icon: const Icon(Icons.chevron_right)),
-      ]),
-      const SizedBox(height: 6),
-      ...body,
     ]);
   }
 }
