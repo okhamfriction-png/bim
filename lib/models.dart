@@ -233,7 +233,7 @@ class Schedule {
             .map((b) => b.toJson())
             .toList(),
         'events': events,
-        'moves': moves,
+        'moves': moves.toList()..sort((a, b) => '${a['key']}'.compareTo('${b['key']}')),
         'checks': Map.fromEntries(
             checks.entries.toList()..sort((a, b) => a.key.compareTo(b.key))),
         'reviewedOn': reviewedOn,

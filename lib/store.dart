@@ -309,7 +309,49 @@ class Store extends ChangeNotifier {
         tasks[tasks.indexOf(l)] = r;
       }
     }
-    if (remote.schedule.updatedAt > schedule.updatedAt) schedule = remote.schedule;
+    _mergeSchedule(remote.schedule);
+  }
+
+  /// Fusionne l'agenda sans jamais rien perdre : un agenda local vide ne peut pas
+  /// effacer les blocs du dépôt, et les appuis « J'y suis », déplacements, sprints
+  /// et heures de fin des deux côtés sont réunis.
+  void _mergeSchedule(Schedule r) {
+    final l = schedule;
+    final remoteNewer = r.updatedAt > l.updatedAt;
+    final newer = remoteNewer ? r : l;
+    final older = remoteNewer ? l : r;
+    // Réglages (blocs, dates, alternance) : le côté le plus récent qui a des blocs.
+    final cfg = newer.blocks.isNotEmpty ? newer : (older.blocks.isNotEmpty ? older : newer);
+    final other = identical(cfg, l) ? r : l;
+    final events = [
+      for (final e in cfg.events)
+        {
+          ...e,
+          'cutEnd': newer.events.where((x) => x['id'] == e['id']).firstOrNull?['cutEnd'] ??
+              older.events.where((x) => x['id'] == e['id']).firstOrNull?['cutEnd'] ??
+              e['cutEnd'],
+        }
+    ];
+    final moves = <String, Map<String, dynamic>>{
+      for (final m in older.moves) '${m['key']}': m,
+      for (final m in newer.moves) '${m['key']}': m,
+    };
+    final checks = <String, int>{...other.checks};
+    cfg.checks.forEach((k, v) => checks[k] = checks.containsKey(k) && checks[k]! < v ? checks[k]! : v);
+    final reviews = [l.reviewedOn, r.reviewedOn].whereType<String>().toList()..sort();
+    schedule = Schedule(
+      updatedAt: newer.updatedAt,
+      anchor: cfg.anchor,
+      nameA: cfg.nameA,
+      nameB: cfg.nameB,
+      blocks: cfg.blocks,
+      events: events,
+      moves: moves.values.toList(),
+      checks: checks,
+      reviewedOn: reviews.isEmpty ? null : reviews.last,
+      since: cfg.since,
+      sprints: {...l.sprints, ...r.sprints}.toList()..sort(),
+    );
   }
 
   Future<void> sync() async {
@@ -325,7 +367,9 @@ class Store extends ChangeNotifier {
     };
     try {
       for (var i = 0; i < 3; i++) {
-        final r = await http.get(Uri.parse('$base?t=${nowMs()}'), headers: headers);
+        final r = await http
+            .get(Uri.parse('$base?t=${nowMs()}'), headers: headers)
+            .timeout(const Duration(seconds: 20));
         String? sha;
         String? theirs;
         if (r.statusCode == 200) {
@@ -348,7 +392,7 @@ class Store extends ChangeNotifier {
               'message': 'bim : synchro',
               'content': base64.encode(utf8.encode(mine)),
               'sha': ?sha,
-            }));
+            })).timeout(const Duration(seconds: 20));
         if (p.statusCode == 200 || p.statusCode == 201) break;
         if (p.statusCode != 409 && p.statusCode != 422) {
           throw 'GitHub a refusé l\'écriture (${p.statusCode})';
@@ -359,6 +403,9 @@ class Store extends ChangeNotifier {
       syncState = 'ok';
       syncError = '';
       lastSync = nowMs();
+    } on TimeoutException {
+      syncState = 'error';
+      syncError = 'GitHub ne répond pas. Vérifie la connexion, puis réessaie.';
     } catch (e) {
       syncState = 'error';
       syncError = '$e';

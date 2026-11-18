@@ -344,10 +344,26 @@ class _SyncSheetState extends State<SyncSheet> {
                 fontWeight: FontWeight.w600)),
         const SizedBox(height: 14),
         FilledButton(
-            onPressed: () => store.setLink(repo.text, token.text),
+            onPressed: store.syncState == 'sync'
+                ? null
+                : () async {
+                    final nav = Navigator.of(context);
+                    final messenger = ScaffoldMessenger.of(context);
+                    FocusScope.of(context).unfocus();
+                    await store.setLink(repo.text, token.text);
+                    if (store.syncState != 'ok') return;
+                    // Réussi : on ferme et on dit ce qui est arrivé.
+                    nav.pop();
+                    final blocks = store.schedule.blocks.where((b) => b.fixed).length;
+                    messenger.showSnackBar(SnackBar(
+                        duration: const Duration(seconds: 6),
+                        content: Text('Relié à GitHub : ${store.backlog.length} tâches dans le '
+                            'Backlog, $blocks blocs fixes dans l\'Agenda.')));
+                  },
             style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-            child: const Text('Relier et synchroniser',
-                style: TextStyle(fontWeight: FontWeight.w800))),
+            child: Text(
+                store.syncState == 'sync' ? 'Synchronisation…' : 'Relier et synchroniser',
+                style: const TextStyle(fontWeight: FontWeight.w800))),
       ]),
     );
   }
