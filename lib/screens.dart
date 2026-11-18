@@ -141,6 +141,25 @@ class _NowScreenState extends State<NowScreen> {
                     icon: Icons.check_circle_rounded),
             ]),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 9, 12, 9),
+            child: Row(children: [
+              Icon(Icons.emoji_events_rounded, size: 19, color: p.accent),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(children: [
+                    TextSpan(
+                        text: 'Score  ${store.weekScore} pts',
+                        style: const TextStyle(fontWeight: FontWeight.w800)),
+                  ]),
+                  style: TextStyle(fontSize: 14.5, color: p.ink),
+                ),
+              ),
+              if (store.sprintGrade != null)
+                Pill('Sprint  ${store.sprintGrade} / 100', p.accent),
+            ]),
+          ),
           if (agenda.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 9, 10, 9),
@@ -1495,6 +1514,43 @@ class ReviewPage extends StatelessWidget {
                   Text('$held / $planned',
                       style: TextStyle(
                           fontSize: 54, height: 1, fontWeight: FontWeight.w900, color: p.ink)),
+                  h('SCORE DE LA SEMAINE'),
+                  Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                    Text('${store.weekScore}',
+                        style: TextStyle(
+                            fontSize: 54,
+                            height: 1,
+                            fontWeight: FontWeight.w900,
+                            color: p.ink)),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 6, bottom: 6),
+                      child: Text('pts',
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.w800, color: p.sub)),
+                    ),
+                    const Spacer(),
+                    if (store.sprintGrade != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Pill('Sprint  ${store.sprintGrade} / 100', p.accent),
+                      ),
+                  ]),
+                  const SizedBox(height: 8),
+                  Text(
+                      'Semaine dernière : ${store.lastWeekScore} pts.  '
+                      '${[
+                        for (var i = 0; i <= 4; i++)
+                          if (done.any((t) => t.priority == i))
+                            '${prioNames[i]} × ${done.where((t) => t.priority == i).length}'
+                      ].join('  ·  ')}',
+                      style: TextStyle(color: p.ink, fontSize: 14.5)),
+                  const SizedBox(height: 6),
+                  Text(
+                      'Une tâche faite rapporte P0 = 8, P1 = 5, P2 = 3, P3 = 2, P4 = 1 point, '
+                      'multiplié par l\'importance de la catégorie : Mission × 1,5, Contenu et '
+                      'Destiny × 1,2, Personnel × 1. La note du sprint est la part des points '
+                      'du sprint déjà gagnés.',
+                      style: TextStyle(color: p.sub, fontSize: 13, height: 1.35)),
                   h('TÂCHES FAITES · ${done.length}'),
                   if (done.isEmpty) Text('Aucune cette semaine.', style: TextStyle(color: p.sub)),
                   for (final t in done)

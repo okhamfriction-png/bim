@@ -168,6 +168,50 @@ class Store extends ChangeNotifier {
 
   // ---- Tâches ----
 
+  // ---- Score ----
+
+  /// Points d'une tâche faite : la priorité donne la base (P0 = 8 … P4 = 1, comme des
+  /// points d'effort agiles), la catégorie la pondère selon son importance.
+  static const prioPoints = [8, 5, 3, 2, 1];
+  static const catWeight = {
+    'Mission': 1.5,
+    'Contenu': 1.2,
+    'Destiny': 1.2,
+    'Personnel': 1.0,
+    'Parking': 0.5,
+  };
+  static double pointsOf(Task t) => prioPoints[t.priority] * (catWeight[t.cat] ?? 1);
+
+  int _scoreBetween(int from, int to) => tasks
+      .where((t) =>
+          !t.deleted && t.status == 'done' && (t.doneAt ?? 0) >= from && (t.doneAt ?? 0) < to)
+      .fold<double>(0, (a, t) => a + pointsOf(t))
+      .round();
+
+  /// Points gagnés depuis lundi.
+  int get weekScore =>
+      _scoreBetween(Schedule.mondayOf(DateTime.now()).millisecondsSinceEpoch, nowMs() + 1);
+
+  /// Points de la semaine précédente, pour comparer.
+  int get lastWeekScore {
+    final m = Schedule.mondayOf(DateTime.now());
+    return _scoreBetween(DateTime(m.year, m.month, m.day - 7).millisecondsSinceEpoch,
+        m.millisecondsSinceEpoch);
+  }
+
+  /// Note du sprint en cours sur 100 : part des points engagés déjà gagnés.
+  /// Finir un P0 de Mission pèse donc bien plus que finir un P4. Nul sans sprint.
+  int? get sprintGrade {
+    final s = thisMonday;
+    var done = 0.0, all = 0.0;
+    for (final t in tasks) {
+      if (t.deleted || t.sprint != s || t.parked) continue;
+      all += pointsOf(t);
+      if (t.status == 'done') done += pointsOf(t);
+    }
+    return all == 0 ? null : (100 * done / all).round();
+  }
+
   /// Résumé lu par le widget d'écran d'accueil Android : les tâches du sprint et
   /// l'agenda des 14 prochains jours (le widget choisit la ligne du jour).
   Future<void> _feedWidget() async {
