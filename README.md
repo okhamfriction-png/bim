@@ -12,6 +12,10 @@ Les blocs, repères et dates ponctuelles se règlent dans `backlog.json` (clé `
 
 Appli Flutter (web + Android). Les données vivent dans `backlog.json`, dans un dépôt GitHub privé séparé (`<compte>/bim-data`) ; l'appli y accède avec un jeton GitHub saisi dans l'écran Synchronisation (icône nuage).
 
+## Installer sur Android
+
+Télécharge l'APK : https://github.com/okhamfriction-png/bim/releases/latest/download/bim.apk
+
 ## Commande `bin/bim`
 
 Pour ajouter des tâches depuis un terminal ou une session Claude Code (passe par `gh`) :
