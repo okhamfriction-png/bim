@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:video_player/video_player.dart';
 
 import 'models.dart';
 import 'store.dart';
@@ -29,6 +31,18 @@ const domains = <String, Color>{
   'Famille': Color(0xFFEC4899),
   'Perso': Color(0xFF84CC16),
 };
+
+const domainIcons = <String, IconData>{
+  'Travail': Icons.work_rounded,
+  'Contenu': Icons.videocam_rounded,
+  'Destiny': Icons.theater_comedy_rounded,
+  'Projets': Icons.build_rounded,
+  'Sport': Icons.fitness_center_rounded,
+  'Famille': Icons.favorite_rounded,
+  'Perso': Icons.spa_rounded,
+};
+
+IconData iconOf(String d) => domainIcons[d] ?? Icons.label_rounded;
 
 Color domainOf(String d) => domains[d] ?? const Color(0xFF94A3B8);
 
@@ -67,17 +81,24 @@ String dueLabel(String due) {
 class Pill extends StatelessWidget {
   final String text;
   final Color color;
-  const Pill(this.text, this.color, {super.key});
+  final IconData? icon;
+  const Pill(this.text, this.color, {this.icon, super.key});
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
             color: color.withValues(alpha: .16), borderRadius: BorderRadius.circular(99)),
-        child: Text(text,
-            style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
-                color: Color.lerp(color, Pal.of(context).ink, .35))),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          if (icon != null)
+            Padding(
+                padding: const EdgeInsets.only(right: 5),
+                child: Icon(icon, size: 15, color: Color.lerp(color, Pal.of(context).ink, .35))),
+          Text(text,
+              style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: Color.lerp(color, Pal.of(context).ink, .35))),
+        ]),
       );
 }
 
@@ -85,8 +106,9 @@ class Pick extends StatelessWidget {
   final String label;
   final bool on;
   final Color? color;
+  final IconData? icon;
   final VoidCallback onTap;
-  const Pick(this.label, this.on, this.onTap, {this.color, super.key});
+  const Pick(this.label, this.on, this.onTap, {this.color, this.icon, super.key});
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
@@ -101,9 +123,14 @@ class Pick extends StatelessWidget {
           border: Border.all(color: on ? c : p.line, width: 1.5),
           borderRadius: BorderRadius.circular(99),
         ),
-        child: Text(label,
-            style: TextStyle(
-                fontWeight: on ? FontWeight.w700 : FontWeight.w500, color: p.ink)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          if (icon != null)
+            Padding(
+                padding: const EdgeInsets.only(right: 6), child: Icon(icon, size: 17, color: c)),
+          Text(label,
+              style: TextStyle(
+                  fontWeight: on ? FontWeight.w700 : FontWeight.w500, color: p.ink)),
+        ]),
       ),
     );
   }
@@ -142,6 +169,7 @@ class TaskSheet extends StatefulWidget {
 class _TaskSheetState extends State<TaskSheet> {
   late final title = TextEditingController(text: widget.task?.title ?? '');
   late final note = TextEditingController(text: widget.task?.note ?? '');
+  late final links = TextEditingController(text: (widget.task?.links ?? []).join('\n'));
   late int priority = widget.task?.priority ?? 2;
   late String domain = widget.task?.domain ?? 'Perso';
   late String? due = widget.task?.due;
@@ -152,8 +180,10 @@ class _TaskSheetState extends State<TaskSheet> {
     final s = title.text.trim();
     if (s.isEmpty) return;
     final t = widget.task;
+    final ls = links.text.split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
     if (t == null) {
       store.add(Task(
+          links: ls,
           title: s,
           note: note.text.trim(),
           priority: priority,
@@ -164,6 +194,7 @@ class _TaskSheetState extends State<TaskSheet> {
       t
         ..title = s
         ..note = note.text.trim()
+        ..links = ls
         ..priority = priority
         ..domain = domain
         ..due = due
@@ -199,7 +230,8 @@ class _TaskSheetState extends State<TaskSheet> {
       _label(context, 'DOMAINE'),
       Wrap(spacing: 8, runSpacing: 8, children: [
         for (final d in domains.entries)
-          Pick(d.key, domain == d.key, () => setState(() => domain = d.key), color: d.value),
+          Pick(d.key, domain == d.key, () => setState(() => domain = d.key),
+              color: d.value, icon: iconOf(d.key)),
       ]),
       if (!more)
         Padding(
@@ -213,10 +245,20 @@ class _TaskSheetState extends State<TaskSheet> {
         TextField(
           controller: note,
           minLines: 1,
-          maxLines: 5,
+          maxLines: 12,
           textCapitalization: TextCapitalization.sentences,
           decoration: InputDecoration(
-              hintText: 'Détail, lien, contexte', isDense: true, hintStyle: TextStyle(color: p.sub)),
+              hintText: 'Descriptif, script, contexte', isDense: true, hintStyle: TextStyle(color: p.sub)),
+        ),
+        _label(context, 'LIENS ET VIDÉOS'),
+        TextField(
+          controller: links,
+          minLines: 1,
+          maxLines: 5,
+          autocorrect: false,
+          keyboardType: TextInputType.multiline,
+          decoration: InputDecoration(
+              hintText: 'Une adresse par ligne', isDense: true, hintStyle: TextStyle(color: p.sub)),
         ),
         _label(context, 'ÉCHÉANCE'),
         Wrap(spacing: 8, runSpacing: 8, children: [
@@ -358,6 +400,132 @@ class _SyncSheetState extends State<SyncSheet> {
             child: const Text('Relier et synchroniser',
                 style: TextStyle(fontWeight: FontWeight.w800))),
       ]),
+    );
+  }
+}
+
+/// Le contenu d'une tâche : descriptif complet, vidéos, images et liens.
+class TaskBody extends StatelessWidget {
+  final Task task;
+  final TextAlign align;
+  const TaskBody(this.task, {this.align = TextAlign.start, super.key});
+
+  static bool _is(String u, List<String> ext) {
+    final path = (Uri.tryParse(u)?.path ?? u).toLowerCase();
+    return ext.any(path.endsWith);
+  }
+
+  static String _host(String u) {
+    final h = Uri.tryParse(u)?.host.replaceFirst('www.', '') ?? '';
+    if (h.contains('youtu')) return 'YouTube';
+    if (h.contains('instagram')) return 'Instagram';
+    if (h.contains('tiktok')) return 'TikTok';
+    if (h.contains('facebook') || h == 'fb.watch') return 'Facebook';
+    return h.isEmpty ? u : h;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final t = task;
+    return Column(
+        crossAxisAlignment:
+            align == TextAlign.center ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (t.note.isNotEmpty)
+            SelectableText(t.note,
+                textAlign: align,
+                style: TextStyle(fontSize: 15.5, height: 1.45, color: p.ink)),
+          for (final u in t.links)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: _is(u, ['.mp4', '.mov', '.webm', '.m4v'])
+                  ? InlineVideo(u)
+                  : _is(u, ['.png', '.jpg', '.jpeg', '.webp', '.gif'])
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: Image.network(u,
+                              errorBuilder: (c, e, s) =>
+                                  Text('Image introuvable', style: TextStyle(color: p.sub))))
+                      : OutlinedButton.icon(
+                          onPressed: () => launchUrl(Uri.parse(u),
+                              mode: LaunchMode.externalApplication),
+                          icon: const Icon(Icons.open_in_new, size: 18),
+                          label: Text(_host(u), overflow: TextOverflow.ellipsis)),
+            ),
+        ]);
+  }
+}
+
+/// Une vidéo lue dans la tâche. Elle ne se charge qu'au premier toucher.
+class InlineVideo extends StatefulWidget {
+  final String url;
+  const InlineVideo(this.url, {super.key});
+  @override
+  State<InlineVideo> createState() => _InlineVideoState();
+}
+
+class _InlineVideoState extends State<InlineVideo> {
+  VideoPlayerController? c;
+  String? error;
+
+  Future<void> toggle() async {
+    if (c == null) {
+      final v = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+      setState(() => c = v);
+      try {
+        await v.initialize();
+      } catch (e) {
+        debugPrint('Bim vidéo : $e');
+        if (mounted) setState(() => error = 'Vidéo illisible');
+        return;
+      }
+      v.addListener(() {
+        if (mounted) setState(() {});
+      });
+      if (mounted) setState(() {});
+      // Le navigateur peut refuser la lecture automatique : un second toucher la lance.
+      v.play().catchError((_) {});
+      return;
+    }
+    c!.value.isPlaying ? c!.pause() : c!.play();
+  }
+
+  @override
+  void dispose() {
+    c?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ready = c != null && c!.value.isInitialized;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: GestureDetector(
+        onTap: error == null ? toggle : null,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 420),
+          child: AspectRatio(
+            aspectRatio: ready ? c!.value.aspectRatio : 16 / 9,
+            child: Stack(alignment: Alignment.center, children: [
+              const ColoredBox(color: Colors.black, child: SizedBox.expand()),
+              if (ready) VideoPlayer(c!),
+              if (error != null)
+                Text(error!, style: const TextStyle(color: Colors.white70))
+              else if (c != null && !ready)
+                const CircularProgressIndicator(color: Colors.white)
+              else if (!ready || !c!.value.isPlaying)
+                const Icon(Icons.play_circle_fill, size: 64, color: Colors.white),
+              if (ready)
+                Align(
+                    alignment: Alignment.bottomCenter,
+                    child: VideoProgressIndicator(c!, allowScrubbing: true)),
+            ]),
+          ),
+        ),
+      ),
     );
   }
 }

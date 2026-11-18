@@ -22,6 +22,7 @@ class Task {
   String? due; // aaaa-mm-jj
   List<int> days; // jours de répétition (1 = lundi … 7 = dimanche), vide = une seule fois
   String source; // conversation ou agent qui a créé la tâche
+  List<String> links; // liens, vidéos, images
   double rank;
   String status; // todo | done
   int createdAt;
@@ -40,6 +41,7 @@ class Task {
     this.due,
     List<int>? days,
     this.source = '',
+    List<String>? links,
     this.rank = 0,
     this.status = 'todo',
     int? createdAt,
@@ -50,6 +52,7 @@ class Task {
     this.deleted = false,
   })  : id = id ?? newId(),
         days = days ?? [],
+        links = links ?? [],
         createdAt = createdAt ?? nowMs(),
         updatedAt = updatedAt ?? nowMs();
 
@@ -62,6 +65,7 @@ class Task {
         due: j['due'] as String?,
         days: ((j['days'] ?? []) as List).map((e) => (e as num).toInt()).toList(),
         source: (j['source'] ?? '') as String,
+        links: ((j['links'] ?? []) as List).map((e) => '$e').toList(),
         rank: ((j['rank'] ?? 0) as num).toDouble(),
         status: (j['status'] ?? 'todo') as String,
         createdAt: ((j['createdAt'] ?? 0) as num).toInt(),
@@ -81,6 +85,7 @@ class Task {
         'due': due,
         'days': days,
         'source': source,
+        'links': links,
         'rank': rank,
         'status': status,
         'createdAt': createdAt,

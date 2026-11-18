@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """bim — ajoute et consulte les tâches du backlog Bim depuis un terminal ou une session Claude.
 
-  bim add "Titre" [-p 1|2|3] [-d Domaine] [--due AAAA-MM-JJ] [--days 1,3,5] [--note …] [--source …]
+  bim add "Titre" [-p 1|2|3] [-d Domaine] [--due AAAA-MM-JJ] [--days 1,3,5] [--source …]
+          [--note "descriptif" | --note-file script.md] [--link URL]…
   bim list
   bim done <début du titre ou de l'identifiant>
 
@@ -94,6 +95,11 @@ def cmd_add(a):
     if any(d < 1 or d > 7 for d in days):
         sys.exit("--days attend des jours de 1 (lundi) à 7 (dimanche)")
 
+    note = a.note
+    if a.note_file:
+        with open(a.note_file, encoding="utf-8") as f:
+            note = (note + "\n\n" if note else "") + f.read().strip()
+
     def fn(doc):
         tasks = doc.setdefault("tasks", [])
         for t in tasks:
@@ -102,7 +108,8 @@ def cmd_add(a):
         t = {
             "id": "".join(random.choices(string.ascii_lowercase + string.digits, k=8)),
             "title": a.title.strip(),
-            "note": a.note,
+            "note": note,
+            "links": a.link or [],
             "domain": a.domain,
             "priority": a.priority,
             "due": a.due,
@@ -173,7 +180,9 @@ def main():
     a.add_argument("-d", "--domain", default="Perso")
     a.add_argument("--due")
     a.add_argument("--days")
-    a.add_argument("--note", default="")
+    a.add_argument("--note", default="", help="descriptif affiché quand on déplie la tâche")
+    a.add_argument("--note-file", help="fichier texte à mettre en descriptif (script, plan…)")
+    a.add_argument("--link", action="append", help="lien, vidéo (.mp4) ou image ; répétable")
     a.add_argument("--source", default="")
     a.set_defaults(fn=cmd_add)
     sub.add_parser("list", help="voir le backlog").set_defaults(fn=cmd_list)

@@ -121,16 +121,19 @@ class _NowScreenState extends State<NowScreen> {
           Row(children: [
             Expanded(
                 child: TextButton.icon(
+                    style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 2)),
                     onPressed: () => store.start(t),
                     icon: Icon(t.startedAt == null ? Icons.play_arrow_rounded : Icons.pause_rounded),
                     label: Text(t.startedAt == null ? 'Démarrer' : 'Pause'))),
             Expanded(
                 child: TextButton.icon(
+                    style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 2)),
                     onPressed: () => sheet(context, SnoozeSheet(t)),
                     icon: const Icon(Icons.snooze_rounded),
                     label: const Text('Plus tard'))),
             Expanded(
                 child: TextButton.icon(
+                    style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 2)),
                     onPressed: () => sheet(context, TaskSheet(task: t)),
                     icon: const Icon(Icons.edit_outlined),
                     label: const Text('Modifier'))),
@@ -176,7 +179,7 @@ class _Card extends StatelessWidget {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Wrap(spacing: 8, runSpacing: 8, children: [
-          Pill(t.domain, d),
+          Pill(t.domain, d, icon: iconOf(t.domain)),
           Pill(t.eff == 0 ? 'Échéance ${dueLabel(t.due!)}' : prioNames[t.eff], prioColors[t.eff]),
           if (t.repeats) Pill('Rituel', p.sub),
         ]),
@@ -192,12 +195,11 @@ class _Card extends StatelessWidget {
                         fontWeight: FontWeight.w900,
                         letterSpacing: -.5,
                         color: p.ink)),
-                if (t.note.isNotEmpty)
+                if (t.note.isNotEmpty || t.links.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 14),
-                    child: Text(t.note,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 16, height: 1.4, color: p.sub)),
+                    child: TaskBody(t,
+                        align: t.note.length > 160 ? TextAlign.start : TextAlign.center),
                   ),
               ]),
             ),
@@ -249,7 +251,7 @@ class BacklogScreen extends StatefulWidget {
 }
 
 class _BacklogScreenState extends State<BacklogScreen> {
-  String? filter;
+  String group = 'prio'; // prio | domain | source
 
   String waitReason(Task t) {
     final n = DateTime.now();
@@ -270,41 +272,42 @@ class _BacklogScreenState extends State<BacklogScreen> {
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
-    bool keep(Task t) => filter == null || t.domain == filter;
-    final ready = store.ready.where(keep).toList();
-    final waiting = store.waiting.where(keep).toList();
-    final done = store.doneToday.where((t) => !t.repeats && keep(t)).toList();
-    final used = {for (final t in store.tasks.where((t) => t.open)) t.domain};
+    final ready = store.ready;
+    final waiting = store.waiting;
+    final done = store.doneToday.where((t) => !t.repeats).toList();
 
     final header = Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('${store.ready.length} à faire',
+        Text('${ready.length} à faire',
             style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: p.ink)),
-        if (used.length > 1)
-          Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(children: [
-                Pick('Tout', filter == null, () => setState(() => filter = null)),
-                for (final d in domains.keys.where(used.contains))
-                  Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: Pick(d, filter == d,
-                        () => setState(() => filter = d),
-                        color: domainOf(d)),
-                  ),
-              ]),
-            ),
-          ),
+        const SizedBox(height: 12),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(children: [
+            Pick('Priorité', group == 'prio', () => setState(() => group = 'prio'),
+                icon: Icons.bolt_rounded),
+            const SizedBox(width: 8),
+            Pick('Domaine', group == 'domain', () => setState(() => group = 'domain'),
+                icon: Icons.category_rounded),
+            const SizedBox(width: 8),
+            Pick('Origine', group == 'source', () => setState(() => group = 'source'),
+                icon: Icons.forum_rounded),
+          ]),
+        ),
       ]),
     );
 
-    Widget section(String title) => Padding(
-          padding: const EdgeInsets.fromLTRB(20, 22, 20, 6),
-          child: Text(title,
-              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: p.sub)),
+    Widget section(String title, {IconData? icon, Color? color}) => Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 6),
+          child: Row(children: [
+            if (icon != null)
+              Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Icon(icon, size: 18, color: color ?? p.sub)),
+            Text(title,
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: p.sub)),
+          ]),
         );
 
     final footer = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -315,75 +318,112 @@ class _BacklogScreenState extends State<BacklogScreen> {
               textAlign: TextAlign.center, style: TextStyle(color: p.sub)),
         ),
       if (waiting.isNotEmpty) section('EN ATTENTE'),
-      for (final t in waiting) _Tile(t, index: null, sub: waitReason(t), dim: true),
+      for (final t in waiting)
+        _Tile(t, key: ValueKey('w${t.id}'), index: null, sub: waitReason(t), dim: true),
       if (done.isNotEmpty) section('FAIT AUJOURD\'HUI'),
-      for (final t in done) _Tile(t, index: null, dim: true, struck: true),
+      for (final t in done)
+        _Tile(t, key: ValueKey('d${t.id}'), index: null, dim: true, struck: true),
       const SizedBox(height: 90),
     ]);
 
-    return ReorderableListView.builder(
-      header: header,
-      footer: footer,
-      buildDefaultDragHandles: false,
-      itemCount: ready.length,
-      onReorder: store.reorder,
-      proxyDecorator: (child, _, _) => Material(color: Colors.transparent, child: child),
-      itemBuilder: (c, i) =>
-          _Tile(ready[i], key: ValueKey(ready[i].id), index: filter == null ? i : null),
-    );
+    if (group == 'prio') {
+      return ReorderableListView.builder(
+        header: header,
+        footer: footer,
+        buildDefaultDragHandles: false,
+        itemCount: ready.length,
+        onReorder: store.reorder,
+        proxyDecorator: (child, _, _) => Material(color: Colors.transparent, child: child),
+        itemBuilder: (c, i) => _Tile(ready[i], key: ValueKey(ready[i].id), index: i),
+      );
+    }
+
+    String keyOf(Task t) =>
+        group == 'domain' ? t.domain : (t.source.isEmpty ? 'Ajoutées par moi' : t.source);
+    final groups = <String, List<Task>>{};
+    if (group == 'domain') {
+      for (final d in domains.keys) {
+        groups[d] = [];
+      }
+    }
+    for (final t in ready) {
+      groups.putIfAbsent(keyOf(t), () => []).add(t);
+    }
+    groups.removeWhere((k, v) => v.isEmpty);
+    return ListView(children: [
+      header,
+      for (final g in groups.entries) ...[
+        section('${g.key.toUpperCase()} · ${g.value.length}',
+            icon: group == 'domain'
+                ? iconOf(g.key)
+                : (g.key == 'Ajoutées par moi' ? Icons.person_rounded : Icons.forum_rounded),
+            color: group == 'domain' ? domainOf(g.key) : null),
+        for (final t in g.value) _Tile(t, key: ValueKey(t.id), index: null),
+      ],
+      footer,
+    ]);
   }
 }
 
-class _Tile extends StatelessWidget {
+/// Une tâche dans la liste : icône et couleur du domaine, se déplie au toucher.
+class _Tile extends StatefulWidget {
   final Task t;
   final int? index; // position pour le glisser-déposer
   final String? sub;
   final bool dim, struck;
-  const _Tile(this.t, {required this.index, this.sub, this.dim = false, this.struck = false, super.key});
+  const _Tile(this.t,
+      {required this.index, this.sub, this.dim = false, this.struck = false, super.key});
+  @override
+  State<_Tile> createState() => _TileState();
+}
+
+class _TileState extends State<_Tile> {
+  bool open = false;
 
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
-    
+    final t = widget.t;
+    final dim = widget.dim, struck = widget.struck, sub = widget.sub;
+    final color = domainOf(t.domain);
     final meta = [
-      t.domain,
-      if (sub != null && sub!.isNotEmpty) sub!,
+      if (sub != null && sub.isNotEmpty) sub,
       if (sub == null && !t.repeats && t.due != null) dueLabel(t.due!),
       if (sub == null && t.repeats) 'rituel',
-      if (t.source.isNotEmpty) 'via ${t.source}',
+      t.source.isNotEmpty ? 'via ${t.source}' : t.domain,
     ].join(' · ');
-    final tile = Opacity(
-      opacity: dim ? .55 : 1,
+    return Opacity(
+      opacity: dim && !open ? .55 : 1,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
         decoration: BoxDecoration(
             color: p.card,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: p.line)),
+            border: Border.all(color: open ? color : p.line)),
         clipBehavior: Clip.antiAlias,
-        child: IntrinsicHeight(
-          child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Container(width: 6, color: prioColors[t.eff]),
-            IconButton(
-              tooltip: struck ? 'Remettre à faire' : 'Terminé',
-              onPressed: dim
-                  ? (struck ? () => store.reopen(t) : null)
-                  : () {
-                      HapticFeedback.lightImpact();
-                      store.complete(t);
-                    },
-              icon: Icon(struck ? Icons.check_circle : Icons.circle_outlined,
-                  color: struck ? p.accent : p.sub, size: 26),
-            ),
-            Expanded(
-              child: InkWell(
-                onTap: () => sheet(context, TaskSheet(task: t)),
+        child: Stack(children: [
+          Positioned(
+              left: 0, top: 0, bottom: 0, width: 6, child: ColoredBox(color: prioColors[t.eff])),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+            alignment: Alignment.topCenter,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              InkWell(
+                onTap: () => setState(() => open = !open),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
+                  padding: const EdgeInsets.fromLTRB(18, 10, 0, 10),
+                  child: Row(children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                          color: color.withValues(alpha: .18), shape: BoxShape.circle),
+                      child: Icon(iconOf(t.domain), color: color, size: 21),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Text(t.title,
                             style: TextStyle(
                                 fontSize: 16.5,
@@ -391,34 +431,82 @@ class _Tile extends StatelessWidget {
                                 color: p.ink,
                                 decoration: struck ? TextDecoration.lineThrough : null)),
                         const SizedBox(height: 3),
-                        Text(meta,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 13, color: p.sub)),
+                        Row(children: [
+                          if (t.note.isNotEmpty)
+                            Padding(
+                                padding: const EdgeInsets.only(right: 5),
+                                child: Icon(Icons.notes_rounded, size: 15, color: p.sub)),
+                          if (t.links.isNotEmpty)
+                            Padding(
+                                padding: const EdgeInsets.only(right: 5),
+                                child: Icon(Icons.play_circle_outline, size: 15, color: p.sub)),
+                          Expanded(
+                            child: Text(meta,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 13, color: p.sub)),
+                          ),
+                        ]),
                       ]),
+                    ),
+                    if (t.snoozed)
+                      IconButton(
+                          tooltip: 'Réveiller',
+                          onPressed: () => store.wake(t),
+                          icon: Icon(Icons.alarm_on, color: p.sub)),
+                    IconButton(
+                      tooltip: struck ? 'Remettre à faire' : 'Terminé',
+                      onPressed: dim
+                          ? (struck ? () => store.reopen(t) : null)
+                          : () {
+                              HapticFeedback.lightImpact();
+                              store.complete(t);
+                            },
+                      icon: Icon(struck ? Icons.check_circle : Icons.circle_outlined,
+                          color: struck ? p.accent : p.sub, size: 28),
+                    ),
+                    if (widget.index != null)
+                      ReorderableDragStartListener(
+                        index: widget.index!,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(2, 8, 12, 8),
+                          child: Icon(Icons.drag_indicator, color: p.sub),
+                        ),
+                      )
+                    else
+                      const SizedBox(width: 6),
+                  ]),
                 ),
               ),
-            ),
-            if (t.snoozed)
-              IconButton(
-                  tooltip: 'Réveiller',
-                  onPressed: () => store.wake(t),
-                  icon: Icon(Icons.alarm_on, color: p.sub)),
-            if (index != null)
-              ReorderableDragStartListener(
-                index: index!,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  child: Icon(Icons.drag_indicator, color: p.sub),
+              if (open)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(22, 2, 16, 8),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    if (t.note.isEmpty && t.links.isEmpty)
+                      Text('Pas de descriptif.', style: TextStyle(color: p.sub))
+                    else
+                      TaskBody(t),
+                    const SizedBox(height: 8),
+                    Row(children: [
+                      Pill(prioNames[t.eff], prioColors[t.eff]),
+                      const Spacer(),
+                      if (!dim)
+                        TextButton.icon(
+                            onPressed: () => sheet(context, SnoozeSheet(t)),
+                            icon: const Icon(Icons.snooze_rounded, size: 18),
+                            label: const Text('Plus tard')),
+                      TextButton.icon(
+                          onPressed: () => sheet(context, TaskSheet(task: t)),
+                          icon: const Icon(Icons.edit_outlined, size: 18),
+                          label: const Text('Modifier')),
+                    ]),
+                  ]),
                 ),
-              )
-            else
-              const SizedBox(width: 12),
-          ]),
-        ),
+            ]),
+          ),
+        ]),
       ),
     );
-    return tile;
   }
 }
 
