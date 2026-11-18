@@ -328,6 +328,110 @@ class Store extends ChangeNotifier {
 
   // ---- Sous-tâches ----
 
+  // ---- Points de valeur : la valeur livrée, comptée quand la case est cochée ----
+
+  int coefOf(Task t) => schedule.coef[t.kindOf] ?? 0;
+  int plannedOf(Task t) => coefOf(t) * t.unitsTotal;
+  int earnedOf(Task t) => coefOf(t) * t.unitsDone;
+
+  /// « Rue 3/10 blocs · 9 pts », vide pour une tâche sans points.
+  String valueLabel(Task t) {
+    final k = kinds[t.kindOf];
+    if (k == null) return '';
+    final c = coefOf(t);
+    String pts(int n) => '$n pt${n > 1 ? 's' : ''}';
+    return t.subs.isEmpty
+        ? '${k.$1} · ${pts(c)}'
+        : '${k.$1} ${t.unitsDone}/${t.unitsTotal} ${k.$2} · ${pts(earnedOf(t))}';
+  }
+
+  /// Instants où les unités d'une tâche ont été livrées.
+  Iterable<int> _deliveries(Task t) sync* {
+    if (t.subs.isEmpty) {
+      if (t.status == 'done') yield t.doneAt ?? t.updatedAt;
+    } else {
+      for (final s in t.subs) {
+        if (s.done) yield s.doneAt ?? t.doneAt ?? t.updatedAt;
+      }
+    }
+  }
+
+  /// Unités livrées par type entre deux instants.
+  Map<String, int> unitsBetween(int from, int to) {
+    final out = <String, int>{};
+    for (final t in tasks) {
+      if (t.deleted || t.kindOf.isEmpty) continue;
+      final n = _deliveries(t).where((d) => d >= from && d < to).length;
+      if (n > 0) out[t.kindOf] = (out[t.kindOf] ?? 0) + n;
+    }
+    return out;
+  }
+
+  int _value(Map<String, int> units) =>
+      units.entries.fold(0, (a, e) => a + e.value * (schedule.coef[e.key] ?? 0));
+
+  (int, int) get _weekSpan {
+    final m = Schedule.mondayOf(DateTime.now());
+    return (m.millisecondsSinceEpoch, DateTime(m.year, m.month, m.day + 7).millisecondsSinceEpoch);
+  }
+
+  /// Unités livrées depuis lundi, par type.
+  Map<String, int> get weekUnits => unitsBetween(_weekSpan.$1, _weekSpan.$2);
+
+  /// Points de valeur gagnés depuis lundi.
+  int get valueWeek => _value(weekUnits);
+
+  int get valueToday {
+    final n = DateTime.now();
+    return _value(unitsBetween(DateTime(n.year, n.month, n.day).millisecondsSinceEpoch,
+        DateTime(n.year, n.month, n.day + 1).millisecondsSinceEpoch));
+  }
+
+  bool kidsWeek(String sprint) =>
+      schedule.nameOf(schedule.weekOf(dateOf(sprint))).toLowerCase().contains('avec');
+
+  /// Cible d'un sprint : celle corrigée à la main, sinon selon la semaine avec ou sans enfants.
+  int targetOf(String sprint) =>
+      schedule.targets[sprint] ??
+      (kidsWeek(sprint) ? schedule.targetKids : schedule.targetFree);
+
+  /// Points planifiés dans un sprint, tâches faites comprises.
+  int plannedIn(String sprint) => tasks
+      .where((t) => !t.deleted && t.sprint == sprint)
+      .fold(0, (a, t) => a + plannedOf(t));
+
+  int p0In(String sprint) =>
+      tasks.where((t) => !t.deleted && t.sprint == sprint && t.priority == 0).length;
+
+  /// « Il manque 12 points, soit 4 blocs de rue. », vide si la cible est atteinte.
+  String get gapText {
+    final gap = targetOf(thisMonday) - valueWeek;
+    if (gap <= 0) return '';
+    final c = schedule.coef['rue'] ?? 0;
+    final n = c > 0 ? (gap / c).ceil() : 0;
+    return 'Il manque $gap point${gap > 1 ? 's' : ''}'
+        '${n > 0 ? ', soit $n bloc${n > 1 ? 's' : ''} de rue' : ''}.';
+  }
+
+  void setCoef(String kind, int v) {
+    schedule.coef[kind] = v.clamp(0, 20);
+    _saveSchedule();
+  }
+
+  void setTarget(String sprint, int v) {
+    schedule.targets[sprint] = v.clamp(0, 500);
+    _saveSchedule();
+  }
+
+  void setDefaultTarget({required bool kids, required int v}) {
+    if (kids) {
+      schedule.targetKids = v.clamp(0, 500);
+    } else {
+      schedule.targetFree = v.clamp(0, 500);
+    }
+    _saveSchedule();
+  }
+
   /// Toutes cochées : la tâche est faite. Une case décochée : elle redevient à faire.
   void _settle(Task t) {
     if (t.subs.isEmpty) return;
@@ -354,6 +458,7 @@ class Store extends ChangeNotifier {
 
   void toggleSub(Task t, Sub s) {
     s.done = !s.done;
+    s.doneAt = s.done ? nowMs() : null;
     _settle(t);
     touch(t);
   }
@@ -479,6 +584,8 @@ class Store extends ChangeNotifier {
     };
     final checks = <String, int>{...other.checks};
     cfg.checks.forEach((k, v) => checks[k] = checks.containsKey(k) && checks[k]! < v ? checks[k]! : v);
+    // Réglages des points : le côté le plus récent qui les connaît.
+    final pts = newer.hasPoints ? newer : (older.hasPoints ? older : newer);
     final reviews = [l.reviewedOn, r.reviewedOn].whereType<String>().toList()..sort();
     schedule = Schedule(
       updatedAt: newer.updatedAt,
@@ -492,6 +599,10 @@ class Store extends ChangeNotifier {
       reviewedOn: reviews.isEmpty ? null : reviews.last,
       since: cfg.since,
       sprints: {...l.sprints, ...r.sprints}.toList()..sort(),
+      coef: pts.coef,
+      targets: {...(identical(pts, l) ? r : l).targets, ...pts.targets},
+      targetKids: pts.targetKids,
+      targetFree: pts.targetFree,
     );
   }
 

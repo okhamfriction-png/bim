@@ -368,6 +368,7 @@ class _TaskSheetState extends State<TaskSheet> {
   late String domain = widget.task?.cat ?? 'Mission';
   late bool call = widget.task?.call ?? false;
   late bool more = widget.task != null;
+  late String kind = widget.task?.kind ?? '';
 
   void save() {
     final s = title.text.trim();
@@ -381,6 +382,7 @@ class _TaskSheetState extends State<TaskSheet> {
           note: note.text.trim(),
           links: ls,
           result: result.text.trim(),
+          kind: kind,
           priority: priority,
           domain: domain,
           call: isCall));
@@ -390,6 +392,7 @@ class _TaskSheetState extends State<TaskSheet> {
         ..note = note.text.trim()
         ..links = ls
         ..result = result.text.trim()
+        ..kind = kind
         ..priority = priority
         ..domain = domain
         ..call = isCall;
@@ -442,6 +445,13 @@ class _TaskSheetState extends State<TaskSheet> {
               child: const Text('Descriptif, liens, résultat…')),
         ),
       if (more) ...[
+        _label(context, 'POINTS DE VALEUR'),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          Pick('Aucun', kind.isEmpty, () => setState(() => kind = '')),
+          for (final k in kinds.entries)
+            Pick('${k.value.$1} · ${store.schedule.coef[k.key]}', kind == k.key,
+                () => setState(() => kind = k.key)),
+        ]),
         _label(context, 'DESCRIPTIF'),
         TextField(
           controller: note,
@@ -533,6 +543,21 @@ class _SyncSheetState extends State<SyncSheet> {
           ])
             Pick(v.$2, store.agendaView == v.$1, () => store.setAgendaView(v.$1)),
         ]),
+        _label(context, 'POINTS DE VALEUR PAR UNITÉ LIVRÉE'),
+        for (final k in kinds.entries)
+          Stepper2('${k.value.$1} (par ${k.value.$2.substring(0, k.value.$2.length - 1)})',
+              store.schedule.coef[k.key] ?? 0, (v) => store.setCoef(k.key, v)),
+        _label(context, 'CIBLE DE POINTS PAR SPRINT'),
+        Stepper2('Semaine avec enfants', store.schedule.targetKids,
+            (v) => store.setDefaultTarget(kids: true, v: v),
+            step: 5),
+        Stepper2('Semaine sans enfants', store.schedule.targetFree,
+            (v) => store.setDefaultTarget(kids: false, v: v),
+            step: 5),
+        for (final sp in store.sprints)
+          Stepper2('Sprint du ${dateOf(sp).day}/${dateOf(sp).month}', store.targetOf(sp),
+              (v) => store.setTarget(sp, v),
+              step: 5),
         _label(context, 'SYNCHRONISATION'),
         Text(
             'Le backlog vit dans un fichier d\'un dépôt GitHub privé. Le téléphone, le web et tes sessions Claude lisent et écrivent le même.',
@@ -583,6 +608,36 @@ class _SyncSheetState extends State<SyncSheet> {
                 style: const TextStyle(fontWeight: FontWeight.w800))),
       ]),
     );
+  }
+}
+
+/// Une ligne de réglage : un libellé, moins, la valeur, plus.
+class Stepper2 extends StatelessWidget {
+  final String label;
+  final int value, step;
+  final ValueChanged<int> onChanged;
+  const Stepper2(this.label, this.value, this.onChanged, {this.step = 1, super.key});
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    return Row(children: [
+      Expanded(child: Text(label, style: TextStyle(fontSize: 15, color: p.ink))),
+      IconButton(
+          tooltip: 'Moins',
+          visualDensity: VisualDensity.compact,
+          onPressed: value <= 0 ? null : () => onChanged(value - step),
+          icon: const Icon(Icons.remove_circle_outline)),
+      SizedBox(
+          width: 38,
+          child: Text('$value',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: p.ink))),
+      IconButton(
+          tooltip: 'Plus',
+          visualDensity: VisualDensity.compact,
+          onPressed: () => onChanged(value + step),
+          icon: const Icon(Icons.add_circle_outline)),
+    ]);
   }
 }
 

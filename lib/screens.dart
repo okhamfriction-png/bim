@@ -160,6 +160,36 @@ class _NowScreenState extends State<NowScreen> {
                 Pill('Sprint  ${store.sprintGrade} / 100', p.accent),
             ]),
           ),
+          if (store.sprints.contains(store.thisMonday) || store.valueWeek > 0)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 9, 12, 10),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Row(children: [
+                  Icon(Icons.stars_rounded, size: 19, color: _statusColors['tenu']),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Text(
+                        'Valeur  ${store.valueWeek} / ${store.targetOf(store.thisMonday)} pts',
+                        style: TextStyle(
+                            fontSize: 14.5, fontWeight: FontWeight.w800, color: p.ink)),
+                  ),
+                  Text('+${store.valueToday} aujourd\'hui',
+                      style: TextStyle(
+                          fontSize: 13.5, fontWeight: FontWeight.w700, color: p.sub)),
+                ]),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(99),
+                  child: LinearProgressIndicator(
+                      value: store.targetOf(store.thisMonday) == 0
+                          ? 0
+                          : (store.valueWeek / store.targetOf(store.thisMonday)).clamp(0, 1),
+                      minHeight: 6,
+                      backgroundColor: p.line,
+                      color: _statusColors['tenu']),
+                ),
+              ]),
+            ),
           if (agenda.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 9, 10, 9),
@@ -292,6 +322,8 @@ class _Card extends StatelessWidget {
                     PrioChip(t.priority),
                     Pill(t.cat, domainOf(t.cat), icon: iconOf(t.cat)),
                     if (t.call) Pill('Appel', prioColors[1], icon: Icons.phone_in_talk_rounded),
+                    if (store.valueLabel(t).isNotEmpty)
+                      Pill(store.valueLabel(t), _statusColors['tenu']!, icon: Icons.stars_rounded),
                   ]),
             ),
             IconButton(
@@ -465,6 +497,19 @@ class _BacklogScreenState extends State<BacklogScreen> {
                   color: _statusColors['tenu']),
             ),
           ),
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+              'Prévu ${store.plannedIn(sp)} pts · cible ${store.targetOf(sp)}'
+              '${store.plannedIn(sp) < store.targetOf(sp) ? ' · sous la cible' : ''}'
+              '${store.p0In(sp) > 3 ? ' · ${store.p0In(sp)} P0 (3 max)' : ''}',
+              style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: store.plannedIn(sp) < store.targetOf(sp) || store.p0In(sp) > 3
+                      ? prioColors[0]
+                      : p.sub)),
+        ),
       ]),
       children: [
         if (open.isEmpty)
@@ -727,6 +772,7 @@ class _TileState extends State<_Tile> {
     final dim = struck || t.parked;
     final color = domainOf(t.cat);
     final meta = [
+      if (store.valueLabel(t).isNotEmpty) store.valueLabel(t),
       if (t.call) 'appel ou entretien',
       if (t.pickedToday && !struck) 'aujourd\'hui',
       t.source.isNotEmpty ? 'via ${t.source}' : t.cat,
@@ -798,7 +844,7 @@ class _TileState extends State<_Tile> {
                   ]),
                 ),
                 const SizedBox(width: 8),
-                if (t.subs.isNotEmpty)
+                if (t.subs.isNotEmpty && store.valueLabel(t).isEmpty)
                   Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: SubProgress(t, width: 34)),
@@ -1635,6 +1681,53 @@ class ReviewPage extends StatelessWidget {
                   Text('$held / $planned',
                       style: TextStyle(
                           fontSize: 54, height: 1, fontWeight: FontWeight.w900, color: p.ink)),
+                  h('POINTS DE VALEUR'),
+                  Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                    Text('${store.valueWeek}',
+                        style: TextStyle(
+                            fontSize: 54,
+                            height: 1,
+                            fontWeight: FontWeight.w900,
+                            color: p.ink)),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 6, bottom: 6),
+                      child: Text('/ ${store.targetOf(store.thisMonday)} pts',
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.w800, color: p.sub)),
+                    ),
+                  ]),
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(99),
+                    child: LinearProgressIndicator(
+                        value: store.targetOf(store.thisMonday) == 0
+                            ? 0
+                            : (store.valueWeek / store.targetOf(store.thisMonday)).clamp(0, 1),
+                        minHeight: 7,
+                        backgroundColor: p.line,
+                        color: _statusColors['tenu']),
+                  ),
+                  const SizedBox(height: 10),
+                  for (final k in kinds.entries)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 3),
+                      child: Row(children: [
+                        Expanded(
+                            child: Text(
+                                '${k.value.$1} : ${store.weekUnits[k.key] ?? 0} ${k.value.$2}',
+                                style: TextStyle(fontSize: 15.5, color: p.ink))),
+                        Text(
+                            '${(store.weekUnits[k.key] ?? 0) * (store.schedule.coef[k.key] ?? 0)} pts',
+                            style: TextStyle(
+                                fontSize: 15.5, fontWeight: FontWeight.w800, color: p.ink)),
+                      ]),
+                    ),
+                  const SizedBox(height: 8),
+                  Text(
+                      'Demandes de rue : ${(store.weekUnits['rue'] ?? 0) * askPerBlock}.  '
+                      '${store.gapText.isEmpty ? 'Cible atteinte.' : store.gapText}',
+                      style: TextStyle(
+                          color: p.ink, fontSize: 14.5, fontWeight: FontWeight.w700)),
                   h('SCORE DE LA SEMAINE'),
                   Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
                     Text('${store.weekScore}',

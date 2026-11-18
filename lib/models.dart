@@ -20,14 +20,29 @@ String newId() {
 /// Catégories, dans l'ordre de priorité. Le Parking n'apparaît jamais dans Maintenant.
 const cats = ['Mission', 'Contenu', 'Destiny', 'Personnel', 'Parking'];
 
+/// Types de tâche qui rapportent des points de valeur : (nom, unité au pluriel, points par
+/// unité par défaut). Une tâche n'a qu'un type : pas de cumul.
+const kinds = <String, (String, String, int)>{
+  'rue': ('Rue', 'blocs', 3),
+  'paris': ('Vidéo Paris', 'vidéos', 2),
+  'montee': ('Vidéo montée', 'vidéos', 2),
+  'short': ('Short', 'shorts', 1),
+  'rangement': ('Rangement', 'jours', 1),
+};
+
+/// Demandes de rue dans un bloc.
+const askPerBlock = 20;
+
 /// Une sous-tâche : un titre et une case à cocher.
 class Sub {
   String title;
   bool done;
-  Sub(this.title, {this.done = false});
-  factory Sub.fromJson(Map<String, dynamic> j) =>
-      Sub((j['title'] ?? '') as String, done: (j['done'] ?? false) as bool);
-  Map<String, dynamic> toJson() => {'title': title, 'done': done};
+  int? doneAt; // instant où la case a été cochée
+  Sub(this.title, {this.done = false, this.doneAt});
+  factory Sub.fromJson(Map<String, dynamic> j) => Sub((j['title'] ?? '') as String,
+      done: (j['done'] ?? false) as bool, doneAt: (j['doneAt'] as num?)?.toInt());
+  Map<String, dynamic> toJson() =>
+      {'title': title, 'done': done, if (doneAt != null) 'doneAt': doneAt};
 }
 
 /// Une tâche du backlog. Format partagé avec la commande `bin/bim`.
@@ -51,6 +66,7 @@ class Task {
   List<Sub> subs; // sous-tâches (aucune pour une tâche simple)
   bool archived; // tâche terminée rangée dans les archives
   String result; // résultat facultatif, montré dans la revue (« 2 venus »)
+  String kind; // type de points de valeur (clé de `kinds`), vide = aucun
 
   Task({
     String? id,
@@ -71,6 +87,7 @@ class Task {
     this.deleted = false,
     List<Sub>? subs,
     this.result = '',
+    this.kind = '',
     this.archived = false,
   })  : id = id ?? newId(),
         subs = subs ?? [],
@@ -99,6 +116,7 @@ class Task {
             .map((e) => Sub.fromJson(e as Map<String, dynamic>))
             .toList(),
         result: (j['result'] ?? '') as String,
+        kind: (j['kind'] ?? '') as String,
         archived: (j['archived'] ?? false) as bool,
       );
 
@@ -121,6 +139,7 @@ class Task {
         'deleted': deleted,
         if (subs.isNotEmpty) 'subs': [for (final s in subs) s.toJson()],
         if (result.isNotEmpty) 'result': result,
+        if (kind.isNotEmpty) 'kind': kind,
         if (archived) 'archived': true,
       };
 
@@ -132,6 +151,22 @@ class Task {
   bool get open => !deleted && status == 'todo';
   int get subsDone => subs.where((s) => s.done).length;
   String get progress => '$subsDone/${subs.length}';
+
+  /// Type de points : celui choisi, sinon celui annoncé au début du titre (« Rue · … »).
+  String get kindOf {
+    if (kinds.containsKey(kind)) return kind;
+    final s = title.toLowerCase();
+    if (s.startsWith('rue ·')) return 'rue';
+    if (s.startsWith('vidéo paris')) return 'paris';
+    if (s.startsWith('vidéo montée')) return 'montee';
+    if (s.startsWith('short ·')) return 'short';
+    if (s.startsWith('rangement ·')) return 'rangement';
+    return '';
+  }
+
+  /// Unités à livrer : une par sous-tâche, sinon la tâche elle-même.
+  int get unitsTotal => subs.isEmpty ? 1 : subs.length;
+  int get unitsDone => subs.isEmpty ? (status == 'done' ? 1 : 0) : subsDone;
   Sub? get nextSub => subs.where((s) => !s.done).firstOrNull;
   bool get pickedToday => pickedOn == ymd(DateTime.now());
   bool doneOn(DateTime d) =>
@@ -213,6 +248,11 @@ class Schedule {
   String? reviewedOn; // dimanche de la dernière revue faite
   List<String> sprints; // sprints créés : le lundi de chaque semaine
   int since; // les blocs commencés avant cet instant ne sont pas comptés
+  Map<String, int> coef; // points de valeur par unité, par type
+  Map<String, int> targets; // cible de points corrigée à la main, par sprint
+  int targetKids; // cible d'une semaine avec enfants
+  int targetFree; // cible d'une semaine sans enfants
+  bool hasPoints; // faux si le fichier lu ne connaissait pas encore les points
 
   Schedule({
     this.updatedAt = 0,
@@ -226,7 +266,14 @@ class Schedule {
     this.reviewedOn,
     this.since = 0,
     List<String>? sprints,
-  })  : blocks = blocks ?? [],
+    Map<String, int>? coef,
+    Map<String, int>? targets,
+    this.targetKids = 70,
+    this.targetFree = 90,
+    this.hasPoints = true,
+  })  : coef = {for (final k in kinds.entries) k.key: coef?[k.key] ?? k.value.$3},
+        targets = targets ?? {},
+        blocks = blocks ?? [],
         sprints = sprints ?? [],
         events = events ?? [],
         moves = moves ?? [],
@@ -250,7 +297,15 @@ class Schedule {
         reviewedOn: j['reviewedOn'] as String?,
         since: ((j['since'] ?? 0) as num).toInt(),
         sprints: ((j['sprints'] ?? []) as List).map((e) => '$e').toList(),
+        coef: _ints(j['points']?['coef']),
+        targets: _ints(j['points']?['targets']),
+        targetKids: ((j['points']?['kids'] ?? 70) as num).toInt(),
+        targetFree: ((j['points']?['free'] ?? 90) as num).toInt(),
+        hasPoints: j['points'] != null,
       );
+
+  static Map<String, int> _ints(dynamic v) =>
+      ((v ?? {}) as Map).map((k, x) => MapEntry('$k', (x as num).toInt()));
 
   Map<String, dynamic> toJson() => {
         'updatedAt': updatedAt,
@@ -267,6 +322,13 @@ class Schedule {
         'reviewedOn': reviewedOn,
         'since': since,
         'sprints': sprints.toList()..sort(),
+        'points': {
+          'coef': {for (final k in kinds.keys) k: coef[k]},
+          'targets': Map.fromEntries(
+              targets.entries.toList()..sort((a, b) => a.key.compareTo(b.key))),
+          'kids': targetKids,
+          'free': targetFree,
+        },
       };
 
   static DateTime mondayOf(DateTime d) =>
