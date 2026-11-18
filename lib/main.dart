@@ -36,6 +36,11 @@ ThemeData _theme(Pal p, Brightness b) => ThemeData(
       snackBarTheme: SnackBarThemeData(
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+      popupMenuTheme: PopupMenuThemeData(
+          color: p.card,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14), side: BorderSide(color: p.line))),
       textButtonTheme: TextButtonThemeData(
           style: TextButton.styleFrom(
               foregroundColor: p.ink,
@@ -61,8 +66,15 @@ ThemeData _theme(Pal p, Brightness b) => ThemeData(
 class BimApp extends StatelessWidget {
   const BimApp({super.key});
   @override
-  Widget build(BuildContext context) => MaterialApp(
+  Widget build(BuildContext context) => ListenableBuilder(
+      listenable: store,
+      builder: (context, _) => MaterialApp(
         title: 'Bim',
+        themeMode: switch (store.themeMode) {
+          'light' => ThemeMode.light,
+          'dark' => ThemeMode.dark,
+          _ => ThemeMode.system,
+        },
         debugShowCheckedModeBanner: false,
         theme: _theme(Pal.light, Brightness.light),
         darkTheme: _theme(Pal.dark, Brightness.dark),
@@ -70,7 +82,7 @@ class BimApp extends StatelessWidget {
         supportedLocales: const [Locale('fr')],
         localizationsDelegates: GlobalMaterialLocalizations.delegates,
         home: const Shell(),
-      );
+      ));
 }
 
 class Shell extends StatefulWidget {

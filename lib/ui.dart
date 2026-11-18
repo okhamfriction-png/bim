@@ -361,6 +361,7 @@ class _TaskSheetState extends State<TaskSheet> {
   late final title = TextEditingController(text: widget.task?.title ?? '');
   late final note = TextEditingController(text: widget.task?.note ?? '');
   late final links = TextEditingController(text: (widget.task?.links ?? []).join('\n'));
+  late final result = TextEditingController(text: widget.task?.result ?? '');
   late int priority = widget.task?.priority ?? 2;
   late String domain = widget.task?.cat ?? 'Mission';
   late bool call = widget.task?.call ?? false;
@@ -377,6 +378,7 @@ class _TaskSheetState extends State<TaskSheet> {
           title: s,
           note: note.text.trim(),
           links: ls,
+          result: result.text.trim(),
           priority: priority,
           domain: domain,
           call: isCall));
@@ -385,6 +387,7 @@ class _TaskSheetState extends State<TaskSheet> {
         ..title = s
         ..note = note.text.trim()
         ..links = ls
+        ..result = result.text.trim()
         ..priority = priority
         ..domain = domain
         ..call = isCall;
@@ -434,7 +437,7 @@ class _TaskSheetState extends State<TaskSheet> {
           padding: const EdgeInsets.only(top: 10),
           child: TextButton(
               onPressed: () => setState(() => more = true),
-              child: const Text('Descriptif, liens…')),
+              child: const Text('Descriptif, liens, résultat…')),
         ),
       if (more) ...[
         _label(context, 'DESCRIPTIF'),
@@ -455,6 +458,17 @@ class _TaskSheetState extends State<TaskSheet> {
           keyboardType: TextInputType.multiline,
           decoration: InputDecoration(
               hintText: 'Une adresse par ligne', isDense: true, hintStyle: TextStyle(color: p.sub)),
+        ),
+        _label(context, 'RÉSULTAT (FACULTATIF)'),
+        TextField(
+          controller: result,
+          maxLength: 60,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: InputDecoration(
+              hintText: 'Ex. : 2 venus',
+              isDense: true,
+              counterText: '',
+              hintStyle: TextStyle(color: p.sub)),
         ),
       ],
       const SizedBox(height: 22),
@@ -503,6 +517,10 @@ class _SyncSheetState extends State<SyncSheet> {
       listenable: store,
       builder: (context, _) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
         const Text('Réglages', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+        _label(context, 'APPARENCE'),
+        Segmented(const {'system': 'Système', 'light': 'Clair', 'dark': 'Sombre'},
+            store.themeMode, store.setThemeMode,
+            expand: true),
         _label(context, 'VUE DE L\'AGENDA À L\'OUVERTURE'),
         Wrap(spacing: 8, runSpacing: 8, children: [
           for (final v in const [
@@ -563,6 +581,181 @@ class _SyncSheetState extends State<SyncSheet> {
                 style: const TextStyle(fontWeight: FontWeight.w800))),
       ]),
     );
+  }
+}
+
+/// Avancement des sous-tâches : « 2/5 » et une petite barre.
+class SubProgress extends StatelessWidget {
+  final Task task;
+  final double width;
+  const SubProgress(this.task, {this.width = 44, super.key});
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final t = task;
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Text(t.progress,
+          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: p.ink)),
+      const SizedBox(width: 6),
+      SizedBox(
+        width: width,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(99),
+          child: LinearProgressIndicator(
+              value: t.subsDone / t.subs.length,
+              minHeight: 5,
+              backgroundColor: p.line,
+              color: const Color(0xFF22C55E)),
+        ),
+      ),
+    ]);
+  }
+}
+
+/// Une case à cocher ronde de sous-tâche.
+class SubCheck extends StatelessWidget {
+  final Task task;
+  final Sub sub;
+  final VoidCallback? onChanged;
+  const SubCheck(this.task, this.sub, {this.onChanged, super.key});
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: () {
+        store.toggleSub(task, sub);
+        onChanged?.call();
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 7),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(sub.done ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+              size: 22, color: sub.done ? const Color(0xFF22C55E) : p.sub),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 1),
+              child: Text(sub.title,
+                  style: TextStyle(
+                      fontSize: 15,
+                      color: sub.done ? p.sub : p.ink,
+                      decoration: sub.done ? TextDecoration.lineThrough : null)),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Les sous-tâches d'une tâche dépliée : cases à cocher, ajout à la chaîne, duplication.
+class SubList extends StatefulWidget {
+  final Task task;
+  const SubList(this.task, {super.key});
+  @override
+  State<SubList> createState() => _SubListState();
+}
+
+class _SubListState extends State<SubList> {
+  final field = TextEditingController();
+  final focus = FocusNode();
+
+  void add([int count = 1]) {
+    final t = widget.task;
+    final s = field.text.trim().isEmpty && count > 1 ? t.title : field.text;
+    if (s.trim().isEmpty) return;
+    store.addSubs(t, s, count);
+    field.clear();
+    focus.requestFocus(); // le champ reste ouvert pour en saisir plusieurs d'affilée
+  }
+
+  @override
+  void dispose() {
+    field.dispose();
+    focus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final t = widget.task;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (t.subs.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Row(children: [
+            Text('SOUS-TÂCHES',
+                style: TextStyle(
+                    fontSize: 12, letterSpacing: .6, fontWeight: FontWeight.w800, color: p.sub)),
+            const Spacer(),
+            SubProgress(t, width: 70),
+          ]),
+        ),
+      for (final s in t.subs)
+        Row(children: [
+          Expanded(child: SubCheck(t, s)),
+          IconButton(
+              tooltip: 'Retirer la sous-tâche',
+              visualDensity: VisualDensity.compact,
+              onPressed: () => store.removeSub(t, s),
+              icon: Icon(Icons.close_rounded, size: 18, color: p.sub)),
+        ]),
+      Container(
+        margin: const EdgeInsets.only(top: 4),
+        padding: const EdgeInsets.only(left: 10),
+        decoration: BoxDecoration(
+            color: p.card,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: p.line)),
+        child: Row(children: [
+          Icon(Icons.add_rounded, size: 20, color: p.sub),
+          const SizedBox(width: 6),
+          Expanded(
+            child: TextField(
+              controller: field,
+              focusNode: focus,
+              textCapitalization: TextCapitalization.sentences,
+              textInputAction: TextInputAction.done,
+              style: const TextStyle(fontSize: 15),
+              decoration: InputDecoration(
+                  hintText: 'Ajouter une sous-tâche',
+                  isDense: true,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  hintStyle: TextStyle(color: p.sub)),
+              onSubmitted: (_) => add(),
+            ),
+          ),
+          PopupMenuButton<int>(
+            tooltip: 'Dupliquer en N sous-tâches',
+            onSelected: add,
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                  enabled: false,
+                  height: 34,
+                  child: Text('Dupliquer en N sous-tâches',
+                      style: TextStyle(
+                          fontSize: 12.5, fontWeight: FontWeight.w800, color: p.sub))),
+              for (final n in const [2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20])
+                PopupMenuItem(value: n, height: 38, child: Text('× $n')),
+            ],
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.copy_all_rounded, size: 18, color: p.sub),
+                const SizedBox(width: 4),
+                Text('× N',
+                    style: TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w800, color: p.sub)),
+              ]),
+            ),
+          ),
+        ]),
+      ),
+    ]);
   }
 }
 

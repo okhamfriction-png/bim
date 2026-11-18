@@ -17,6 +17,7 @@ class Store extends ChangeNotifier {
 
   String repo = '';
   String token = '';
+  String themeMode = 'system'; // apparence : system | light | dark
   String agendaView = 'semaine'; // vue de l'agenda à l'ouverture : jour | semaine | mois | annee
   String syncState = 'off'; // off | sync | ok | error
   String syncError = '';
@@ -31,6 +32,7 @@ class Store extends ChangeNotifier {
     repo = _prefs.getString('repo') ?? '';
     token = _prefs.getString('token') ?? '';
     agendaView = _prefs.getString('agendaView') ?? 'semaine';
+    themeMode = _prefs.getString('themeMode') ?? 'system';
     final raw = _prefs.getString('doc');
     if (raw != null) {
       try {
@@ -49,6 +51,12 @@ class Store extends ChangeNotifier {
   void setAgendaView(String v) {
     agendaView = v;
     _prefs.setString('agendaView', v);
+    notifyListeners();
+  }
+
+  void setThemeMode(String v) {
+    themeMode = v;
+    _prefs.setString('themeMode', v);
     notifyListeners();
   }
 
@@ -224,6 +232,43 @@ class Store extends ChangeNotifier {
   void reopen(Task t) {
     t.doneAt = null;
     t.status = 'todo';
+    touch(t);
+  }
+
+  // ---- Sous-tâches ----
+
+  /// Toutes cochées : la tâche est faite. Une case décochée : elle redevient à faire.
+  void _settle(Task t) {
+    if (t.subs.isEmpty) return;
+    final all = t.subs.every((s) => s.done);
+    if (all && t.status != 'done') {
+      t.doneAt = nowMs();
+      t.status = 'done';
+    } else if (!all && t.status == 'done') {
+      t.doneAt = null;
+      t.status = 'todo';
+    }
+  }
+
+  void addSubs(Task t, String title, [int count = 1]) {
+    final s = title.trim();
+    if (s.isEmpty || count < 1) return;
+    for (var i = 1; i <= count; i++) {
+      t.subs.add(Sub(count == 1 ? s : '$s ($i/$count)'));
+    }
+    _settle(t);
+    touch(t);
+  }
+
+  void toggleSub(Task t, Sub s) {
+    s.done = !s.done;
+    _settle(t);
+    touch(t);
+  }
+
+  void removeSub(Task t, Sub s) {
+    t.subs.remove(s);
+    _settle(t);
     touch(t);
   }
 

@@ -86,6 +86,10 @@ class _NowScreenState extends State<NowScreen> {
   void done(Task t) {
     HapticFeedback.mediumImpact();
     store.complete(t);
+    cheer();
+  }
+
+  void cheer() {
     setState(() => bim = true);
     Future.delayed(const Duration(milliseconds: 750), () {
       if (mounted) setState(() => bim = false);
@@ -186,7 +190,14 @@ class _NowScreenState extends State<NowScreen> {
                       position: Tween(begin: const Offset(0, .08), end: Offset.zero).animate(a),
                       child: c)),
               child: t != null
-                  ? _Card(key: ValueKey(t.id), task: t, onDone: () => done(t))
+                  ? _Card(
+                      key: ValueKey(t.id),
+                      task: t,
+                      onDone: () => done(t),
+                      onSub: () {
+                        HapticFeedback.lightImpact();
+                        if (t.status == 'done') cheer();
+                      })
                   : const _Empty(key: ValueKey('vide')),
             ),
             IgnorePointer(
@@ -225,8 +236,8 @@ class _NowScreenState extends State<NowScreen> {
 /// La tâche en cours : une carte fermée, étiquettes en haut, « Terminé » en bas.
 class _Card extends StatelessWidget {
   final Task task;
-  final VoidCallback onDone;
-  const _Card({required this.task, required this.onDone, super.key});
+  final VoidCallback onDone, onSub;
+  const _Card({required this.task, required this.onDone, required this.onSub, super.key});
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
@@ -300,6 +311,34 @@ class _Card extends StatelessWidget {
             ),
           ),
         ),
+        if (t.subs.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.fromLTRB(14, 4, 14, 4),
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            decoration: BoxDecoration(
+                color: p.soft,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: p.line)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Row(children: [
+                Text('PROCHAINE SOUS-TÂCHE',
+                    style: TextStyle(
+                        fontSize: 11.5,
+                        letterSpacing: .6,
+                        fontWeight: FontWeight.w800,
+                        color: p.sub)),
+                const Spacer(),
+                SubProgress(t, width: 64),
+              ]),
+              if (t.nextSub != null)
+                SubCheck(t, t.nextSub!, onChanged: onSub)
+              else
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text('Toutes cochées.', style: TextStyle(color: p.sub)),
+                ),
+            ]),
+          ),
         Padding(
           padding: const EdgeInsets.fromLTRB(14, 6, 14, 14),
           child: SizedBox(
@@ -717,6 +756,10 @@ class _TileState extends State<_Tile> {
                   ]),
                 ),
                 const SizedBox(width: 8),
+                if (t.subs.isNotEmpty)
+                  Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: SubProgress(t, width: 34)),
                 PrioChip(t.priority),
                 IconButton(
                   tooltip: struck ? 'Remettre à faire' : 'Terminé',
@@ -743,6 +786,8 @@ class _TileState extends State<_Tile> {
                 Text('Pas de descriptif.', style: TextStyle(color: p.sub))
               else
                 TaskBody(t),
+              const SizedBox(height: 12),
+              SubList(t),
               const SizedBox(height: 12),
               Wrap(spacing: 8, runSpacing: 4, children: [
                 if (t.open && !t.parked && !t.call)
@@ -1405,6 +1450,7 @@ class ReviewPage extends StatelessWidget {
                 final (held, planned) = store.schedule.count(Schedule.mondayOf(DateTime.now()));
                 final done = store.doneThisWeek;
                 final stale = store.stale;
+                final going = store.backlog.where((t) => t.subs.isNotEmpty).toList();
                 Widget h(String s) => Padding(
                       padding: const EdgeInsets.only(top: 26, bottom: 8),
                       child: Text(s,
@@ -1436,6 +1482,28 @@ class ReviewPage extends StatelessWidget {
                         Expanded(
                             child: Text(t.title,
                                 style: TextStyle(fontSize: 15.5, color: p.ink))),
+                        if (t.result.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          Pill(t.result, _statusColors['tenu']!),
+                        ],
+                      ]),
+                    ),
+                  if (going.isNotEmpty) h('EN COURS · ${going.length}'),
+                  for (final t in going)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(children: [
+                        Icon(iconOf(t.cat), size: 18, color: domainOf(t.cat)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                            child: Text('${t.title} : ${t.progress}',
+                                style: TextStyle(fontSize: 15.5, color: p.ink))),
+                        if (t.result.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          Pill(t.result, _statusColors['attente']!),
+                        ],
+                        const SizedBox(width: 8),
+                        SubProgress(t, width: 54),
                       ]),
                     ),
                   h('JAMAIS TOUCHÉES DEPUIS 7 JOURS · ${stale.length}'),

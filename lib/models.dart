@@ -20,6 +20,16 @@ String newId() {
 /// Catégories, dans l'ordre de priorité. Le Parking n'apparaît jamais dans Maintenant.
 const cats = ['Mission', 'Contenu', 'Destiny', 'Personnel', 'Parking'];
 
+/// Une sous-tâche : un titre et une case à cocher.
+class Sub {
+  String title;
+  bool done;
+  Sub(this.title, {this.done = false});
+  factory Sub.fromJson(Map<String, dynamic> j) =>
+      Sub((j['title'] ?? '') as String, done: (j['done'] ?? false) as bool);
+  Map<String, dynamic> toJson() => {'title': title, 'done': done};
+}
+
 /// Une tâche du backlog. Format partagé avec la commande `bin/bim`.
 class Task {
   String id;
@@ -38,6 +48,8 @@ class Task {
   bool call; // appel ou entretien de mission : passe devant tout
   String? sprint; // lundi (aaaa-mm-jj) du sprint d'une semaine où elle est rangée
   bool deleted;
+  List<Sub> subs; // sous-tâches (aucune pour une tâche simple)
+  String result; // résultat facultatif, montré dans la revue (« 2 venus »)
 
   Task({
     String? id,
@@ -56,7 +68,10 @@ class Task {
     this.call = false,
     this.sprint,
     this.deleted = false,
+    List<Sub>? subs,
+    this.result = '',
   })  : id = id ?? newId(),
+        subs = subs ?? [],
         links = links ?? [],
         createdAt = createdAt ?? nowMs(),
         updatedAt = updatedAt ?? nowMs();
@@ -78,6 +93,10 @@ class Task {
         call: (j['call'] ?? false) as bool,
         sprint: j['sprint'] as String?,
         deleted: (j['deleted'] ?? false) as bool,
+        subs: ((j['subs'] ?? []) as List)
+            .map((e) => Sub.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        result: (j['result'] ?? '') as String,
       );
 
   Map<String, dynamic> toJson() => {
@@ -97,6 +116,8 @@ class Task {
         'call': call,
         'sprint': sprint,
         'deleted': deleted,
+        if (subs.isNotEmpty) 'subs': [for (final s in subs) s.toJson()],
+        if (result.isNotEmpty) 'result': result,
       };
 
   /// Catégorie reconnue (les anciennes valeurs retombent sur Mission ou Personnel).
@@ -105,6 +126,9 @@ class Task {
   int get catRank => cats.indexOf(cat);
   bool get parked => cat == 'Parking';
   bool get open => !deleted && status == 'todo';
+  int get subsDone => subs.where((s) => s.done).length;
+  String get progress => '$subsDone/${subs.length}';
+  Sub? get nextSub => subs.where((s) => !s.done).firstOrNull;
   bool get pickedToday => pickedOn == ymd(DateTime.now());
   bool doneOn(DateTime d) =>
       doneAt != null && ymd(DateTime.fromMillisecondsSinceEpoch(doneAt!)) == ymd(d);
