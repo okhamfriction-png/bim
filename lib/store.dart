@@ -334,7 +334,7 @@ class Store extends ChangeNotifier {
   int plannedOf(Task t) => coefOf(t) * t.unitsTotal;
   int earnedOf(Task t) => coefOf(t) * t.unitsDone;
 
-  /// « Rue 3/10 blocs · 9 pts », vide pour une tâche sans points.
+  /// « Rue 3/10 blocs · 9/30 pts », vide pour une tâche sans points.
   String valueLabel(Task t) {
     final k = kinds[t.kindOf];
     if (k == null) return '';
@@ -342,7 +342,7 @@ class Store extends ChangeNotifier {
     String pts(int n) => '$n pt${n > 1 ? 's' : ''}';
     return t.subs.isEmpty
         ? '${k.$1} · ${pts(c)}'
-        : '${k.$1} ${t.unitsDone}/${t.unitsTotal} ${k.$2} · ${pts(earnedOf(t))}';
+        : '${k.$1} ${t.unitsDone}/${t.unitsTotal} ${k.$2} · ${earnedOf(t)}/${pts(plannedOf(t))}';
   }
 
   /// Instants où les unités d'une tâche ont été livrées.
