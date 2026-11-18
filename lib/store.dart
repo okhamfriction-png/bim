@@ -381,7 +381,18 @@ class Store extends ChangeNotifier {
           theirs = remote.encode();
           _merge(remote);
           _prefs.setString('doc', Doc(tasks, schedule).encode());
-        } else if (r.statusCode != 404) {
+        } else if (r.statusCode == 401) {
+          throw 'GitHub ne reconnaît pas ce jeton : il est mal copié ou expiré.';
+        } else if (r.statusCode == 404) {
+          // Fichier absent (premier lancement) ou dépôt invisible pour ce jeton ?
+          final repoCheck = await http
+              .get(Uri.parse('https://api.github.com/repos/$repo'), headers: headers)
+              .timeout(const Duration(seconds: 20));
+          if (repoCheck.statusCode != 200) {
+            throw 'Ce jeton ne voit pas le dépôt $repo. Sur GitHub, modifie le jeton : '
+                '« Only select repositories » → bim-data, puis Contents → « Read and write ».';
+          }
+        } else {
           throw 'GitHub a répondu ${r.statusCode}';
         }
         final mine = Doc(tasks, schedule).encode();
@@ -394,6 +405,10 @@ class Store extends ChangeNotifier {
               'sha': ?sha,
             })).timeout(const Duration(seconds: 20));
         if (p.statusCode == 200 || p.statusCode == 201) break;
+        if (p.statusCode == 403 || p.statusCode == 404) {
+          throw 'Ce jeton peut lire $repo mais pas y écrire. Sur GitHub, modifie le jeton : '
+              'Contents → « Read and write ».';
+        }
         if (p.statusCode != 409 && p.statusCode != 422) {
           throw 'GitHub a refusé l\'écriture (${p.statusCode})';
         }

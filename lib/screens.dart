@@ -885,6 +885,198 @@ class _MonthGrid extends StatelessWidget {
   }
 }
 
+const _blockColors = [
+  Color(0xFFF97316),
+  Color(0xFF16A34A),
+  Color(0xFF9333EA),
+  Color(0xFF2563EB),
+  Color(0xFF0D9488),
+];
+Color _blockColor(String label) =>
+    _blockColors[label.codeUnits.fold<int>(0, (a, b) => a + b) % _blockColors.length];
+
+/// Grille horaire façon agenda : les jours en colonnes, les heures en lignes,
+/// les blocs en rectangles de couleur placés à leur heure.
+class _TimeGrid extends StatelessWidget {
+  final List<DateTime> days;
+  final void Function(DateTime) onDay;
+  const _TimeGrid(this.days, {required this.onDay});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final s = store.schedule;
+    final wide = days.length == 1;
+    final now = DateTime.now();
+    final today = ymd(now);
+
+    // Plage d'heures affichée : au moins 8 h – 20 h, élargie à ce qui est prévu.
+    var lo = 8 * 60, hi = 20 * 60;
+    for (final d in days) {
+      for (final o in s.occs(d)) {
+        if (o.start < lo) lo = o.start;
+        if (o.end > hi) hi = o.end;
+      }
+      for (final e in s.eventsOn(d)) {
+        final st = (e['start'] as num).toInt();
+        if (st < lo) lo = st;
+        if (st + 90 > hi) hi = st + 90;
+      }
+      for (final h in s.hints(d)) {
+        if (h.start < lo) lo = h.start;
+        if (h.start + 30 > hi) hi = h.start + 30;
+      }
+    }
+    final h0 = lo ~/ 60, h1 = ((hi + 59) ~/ 60).clamp(0, 24);
+    const hh = 46.0;
+    final total = (h1 - h0) * hh;
+    double y(int m) => (m - h0 * 60) / 60 * hh;
+
+    Widget box(String label, Color color, int start, int end,
+        {double alpha = 1, IconData? icon, VoidCallback? onTap}) {
+      final height = (y(end) - y(start) - 2).clamp(18.0, total);
+      final size = wide ? 14.5 : 10.5;
+      return Positioned(
+        top: y(start) + 1,
+        left: 2,
+        right: 2,
+        height: height,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: wide ? 10 : 3, vertical: wide ? 6 : 3),
+            decoration: BoxDecoration(
+                color: color.withValues(alpha: alpha), borderRadius: BorderRadius.circular(7)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              if (icon != null) Icon(icon, size: wide ? 16 : 12, color: Colors.white),
+              Flexible(
+                child: Text(wide ? '$label  ·  ${hm(start)} – ${hm(end)}' : label,
+                    overflow: TextOverflow.fade,
+                    style: TextStyle(
+                        fontSize: size,
+                        height: 1.15,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white)),
+              ),
+            ]),
+          ),
+        ),
+      );
+    }
+
+    return Column(children: [
+      if (!wide)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Row(children: [
+            const SizedBox(width: 38),
+            for (final d in days)
+              Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => onDay(d),
+                  child: Column(children: [
+                    Text(dayLetters[d.weekday - 1],
+                        style: TextStyle(
+                            fontSize: 11.5, fontWeight: FontWeight.w800, color: p.sub)),
+                    const SizedBox(height: 2),
+                    Container(
+                      width: 28,
+                      height: 28,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                          color: ymd(d) == today ? p.ink : Colors.transparent,
+                          shape: BoxShape.circle),
+                      child: Text('${d.day}',
+                          style: TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w800,
+                              color: ymd(d) == today ? p.bg : p.ink)),
+                    ),
+                  ]),
+                ),
+              ),
+          ]),
+        ),
+      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        SizedBox(
+          width: 38,
+          height: total,
+          child: Stack(clipBehavior: Clip.none, children: [
+            for (var h = h0; h < h1; h++)
+              Positioned(
+                  top: y(h * 60) - 7,
+                  right: 6,
+                  child: Text('$h h', style: TextStyle(fontSize: 11, color: p.sub))),
+          ]),
+        ),
+        for (final d in days)
+          Expanded(
+            child: Container(
+              height: total,
+              decoration: BoxDecoration(
+                  color: ymd(d) == today && !wide ? p.accent.withValues(alpha: .08) : null,
+                  border: Border(left: BorderSide(color: p.line))),
+              child: Stack(children: [
+                for (var h = h0; h < h1; h++)
+                  Positioned(
+                      top: y(h * 60),
+                      left: 0,
+                      right: 0,
+                      child: Container(height: 1, color: p.line)),
+                for (final o in s.occs(d))
+                  () {
+                    final st = s.statusOf(o);
+                    return box(o.block.label, _blockColor(o.block.label), o.start, o.end,
+                        alpha: st == 'manque' || st == 'hors' ? .4 : 1,
+                        icon: st == 'tenu'
+                            ? Icons.check_circle
+                            : (o.moved ? Icons.swap_horiz_rounded : null),
+                        onTap: st == 'attente'
+                            ? () => sheet(context, MoveSheet(o, Schedule.mondayOf(d)))
+                            : null);
+                  }(),
+                for (final e in s.eventsOn(d))
+                  box('${e['label']}', const Color(0xFFCA8A04), (e['start'] as num).toInt(),
+                      (e['start'] as num).toInt() + 90,
+                      icon: Icons.star_rounded, onTap: () => _askCut(context, e)),
+                for (final h in s.hints(d))
+                  Positioned(
+                    top: y(h.start) - (wide ? 9 : 7),
+                    left: 2,
+                    right: 2,
+                    child: Row(children: [
+                      Icon(Icons.family_restroom_rounded, size: wide ? 16 : 13, color: _kids),
+                      Expanded(
+                        child: wide
+                            ? Padding(
+                                padding: const EdgeInsets.only(left: 6),
+                                child: Text('${hm(h.start)}  ${h.label}',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color.lerp(_kids, p.ink, .35))),
+                              )
+                            : Container(height: 2, color: _kids),
+                      ),
+                    ]),
+                  ),
+                if (ymd(d) == today && now.hour >= h0 && now.hour < h1)
+                  Positioned(
+                    top: y(now.hour * 60 + now.minute) - 1,
+                    left: 0,
+                    right: 0,
+                    child: Container(height: 2, color: const Color(0xFFEF4444)),
+                  ),
+              ]),
+            ),
+          ),
+      ]),
+    ]);
+  }
+}
+
 const agendaViews = {'jour': 'Jour', 'semaine': 'Semaine', 'mois': 'Mois', 'annee': 'Année'};
 
 class AgendaScreen extends StatefulWidget {
@@ -911,84 +1103,6 @@ class _AgendaScreenState extends State<AgendaScreen> {
         cursor = d;
       });
 
-  /// Les blocs, dates ponctuelles et repères d'un jour.
-  List<Widget> items(BuildContext context, DateTime date) {
-    final p = Pal.of(context);
-    final s = store.schedule;
-    Widget card({required Widget child, Color? border, Color? fill, VoidCallback? onTap}) =>
-        GestureDetector(
-          onTap: onTap,
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-            decoration: BoxDecoration(
-                color: fill ?? p.card,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: border ?? p.line)),
-            child: child,
-          ),
-        );
-    Widget time(String a, [String? b]) => SizedBox(
-          width: 84,
-          child: Text(b == null ? a : '$a\n$b',
-              style: TextStyle(color: p.sub, fontWeight: FontWeight.w700, height: 1.35)),
-        );
-    return [
-      for (final o in s.occs(date))
-        Builder(builder: (context) {
-          final st = s.statusOf(o);
-          return card(
-            onTap: st == 'attente'
-                ? () => sheet(context, MoveSheet(o, Schedule.mondayOf(date)))
-                : null,
-            child: Row(children: [
-              time(hm(o.start), hm(o.end)),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(o.block.label,
-                      style:
-                          TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: p.ink)),
-                  Text(o.moved ? 'Bloc fixe, déplacé pour un entretien' : 'Bloc fixe',
-                      style: TextStyle(color: p.sub, fontSize: 13)),
-                ]),
-              ),
-              Pill(_statusNames[st]!, _statusColors[st]!),
-            ]),
-          );
-        }),
-      for (final e in s.eventsOn(date))
-        card(
-          fill: p.accent.withValues(alpha: .14),
-          border: p.accent.withValues(alpha: .6),
-          onTap: () => _askCut(context, e),
-          child: Row(children: [
-            time(hm((e['start'] as num).toInt())),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('${e['label']}',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: p.ink)),
-                Text(
-                    e['cutEnd'] == null
-                        ? 'Touche pour dire à quelle heure la rue s\'arrête'
-                        : 'La rue s\'arrête à ${hm((e['cutEnd'] as num).toInt())}',
-                    style: TextStyle(color: p.sub, fontSize: 13)),
-              ]),
-            ),
-          ]),
-        ),
-      for (final h in s.hints(date))
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-          child: Row(children: [
-            time(hm(h.start)),
-            Icon(Icons.family_restroom_rounded, size: 18, color: _kids),
-            const SizedBox(width: 8),
-            Expanded(child: Text(h.label, style: TextStyle(color: p.sub, fontSize: 15))),
-          ]),
-        ),
-    ];
-  }
-
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
@@ -1001,44 +1115,26 @@ class _AgendaScreenState extends State<AgendaScreen> {
       'mois' => '${cap(monthNames[cursor.month - 1])} ${cursor.year}',
       _ => '${cursor.year}',
     };
-    final today = ymd(DateTime.now());
-
     final body = <Widget>[];
-    if (view == 'jour') {
-      final it = items(context, cursor);
+    if (view == 'jour' || view == 'semaine') {
       body.add(_WeekBadge(cursor));
-      body.addAll(it);
-      if (it.isEmpty) {
+      body.add(_TimeGrid(
+          view == 'jour' ? [cursor] : [for (var i = 0; i < 7; i++) _day(monday, i)],
+          onDay: (d) => go('jour', d)));
+      final hints = view == 'semaine'
+          ? {for (var i = 0; i < 7; i++) ...s.hints(_day(monday, i)).map((h) => h.label)}
+          : <String>{};
+      if (hints.isNotEmpty) {
         body.add(Padding(
-          padding: const EdgeInsets.symmetric(vertical: 36),
-          child: Text('Rien de fixe ce jour-là :\ntout le temps est au backlog.',
-              textAlign: TextAlign.center, style: TextStyle(color: p.sub, fontSize: 15)),
+          padding: const EdgeInsets.only(top: 12),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Icon(Icons.family_restroom_rounded, size: 16, color: _kids),
+            const SizedBox(width: 8),
+            Expanded(
+                child: Text(hints.join(' · '),
+                    style: TextStyle(color: p.sub, fontSize: 13))),
+          ]),
         ));
-      }
-    } else if (view == 'semaine') {
-      body.add(_WeekBadge(cursor));
-      for (var i = 0; i < 7; i++) {
-        final d = _day(monday, i);
-        final it = items(context, d);
-        body.add(GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => go('jour', d),
-          child: Padding(
-            padding: const EdgeInsets.only(top: 10, bottom: 8),
-            child: Row(children: [
-              Text('${cap(dayNames[i])} ${d.day}',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: p.ink)),
-              const SizedBox(width: 8),
-              if (ymd(d) == today) Pill('Aujourd\'hui', p.accent),
-              if (it.isEmpty)
-                Expanded(
-                    child: Text('rien de fixe',
-                        textAlign: TextAlign.end,
-                        style: TextStyle(color: p.sub, fontSize: 13))),
-            ]),
-          ),
-        ));
-        body.addAll(it);
       }
       body.add(const SizedBox(height: 16));
       body.add(OutlinedButton.icon(
