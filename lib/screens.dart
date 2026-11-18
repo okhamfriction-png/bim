@@ -492,7 +492,8 @@ class _BacklogScreenState extends State<BacklogScreen> {
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final all = store.backlog;
-    final done = store.doneToday;
+    final done = store.finished;
+    final nArch = store.archived.length;
     final todo = all.where((t) => !t.parked).length;
 
     final header = Padding(
@@ -633,29 +634,51 @@ class _BacklogScreenState extends State<BacklogScreen> {
               count: '${g.value.length}'),
           children: [for (final t in g.value) _Tile(t, key: ValueKey(t.id))],
         ),
-      if (done.isNotEmpty) ...[
-        const SectionTitle('TERMINÉ'),
+      if (done.isNotEmpty || nArch > 0)
+        SectionTitle('TERMINÉ',
+            trailing: nArch == 0
+                ? null
+                : TextButton.icon(
+                    onPressed: () => openArchive(context),
+                    style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                    icon: const Icon(Icons.inventory_2_outlined, size: 18),
+                    label: Text('Archives · $nArch'))),
+      if (done.isNotEmpty)
         Panel(
-          header: PanelHead('Fait aujourd\'hui',
+          header: PanelHead('Terminées',
               icon: Icons.check_circle_rounded,
               color: _statusColors['tenu'],
-              count: '${done.length}'),
+              count: '${done.length}',
+              trailing: TextButton.icon(
+                  onPressed: () {
+                    final n = done.length;
+                    store.archiveFinished();
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text(n == 1 ? '1 tâche archivée.' : '$n tâches archivées.')));
+                  },
+                  style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                  icon: const Icon(Icons.archive_outlined, size: 18),
+                  label: const Text('Archiver'))),
           children: [for (final t in done) _Tile(t, key: ValueKey('d${t.id}'))],
         ),
-      ],
       const SizedBox(height: 40),
     ]);
   }
 }
 
 /// Ranger une tâche dans un sprint, ou la remettre au backlog.
+/// Pour une tâche archivée : la changer de sprint, sprints passés compris.
 class SprintSheet extends StatelessWidget {
   final Task task;
   const SprintSheet(this.task, {super.key});
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
-    final cur = store.sprintOf(task);
+    final arch = task.archived;
+    final cur = arch ? store.archiveSprint(task) : store.sprintOf(task);
+    final list = arch
+        ? ({...store.schedule.sprints, cur!}.toList()..sort((a, b) => b.compareTo(a)))
+        : store.sprints;
     Widget row(String label, String? value, IconData icon) => ListTile(
           contentPadding: EdgeInsets.zero,
           leading: Icon(icon, color: cur == value ? p.accent : p.sub),
@@ -670,11 +693,11 @@ class SprintSheet extends StatelessWidget {
       const Text('Dans quel sprint ?',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
       const SizedBox(height: 8),
-      for (final sp in store.sprints)
+      for (final sp in list)
         row('${sp == store.thisMonday ? 'Sprint en cours' : 'Sprint'} · ${_range(dateOf(sp))}',
             sp, Icons.flag_rounded),
-      row('Backlog, hors sprint', null, Icons.inbox_rounded),
-      if (store.sprints.isEmpty)
+      if (!arch) row('Backlog, hors sprint', null, Icons.inbox_rounded),
+      if (!arch && store.sprints.isEmpty)
         Padding(
           padding: const EdgeInsets.only(top: 8),
           child: Text('Aucun sprint pour l\'instant : crée-en un en haut du Backlog.',
@@ -824,6 +847,9 @@ class _TileState extends State<_Tile> {
                           ? 'Sprint'
                           : 'Sprint ${_range(dateOf(store.sprintOf(t)!))}',
                       Icons.flag_rounded,
+                      () => sheet(context, SprintSheet(t))),
+                if (t.archived)
+                  action('Sprint ${_range(dateOf(store.archiveSprint(t)))}', Icons.flag_rounded,
                       () => sheet(context, SprintSheet(t))),
                 action('Modifier', Icons.edit_outlined,
                     () => sheet(context, TaskSheet(task: t))),
@@ -1468,6 +1494,101 @@ class _MoveSheetState extends State<MoveSheet> {
           style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
           child: const Text('Déplacer le bloc', style: TextStyle(fontWeight: FontWeight.w800))),
     ]);
+  }
+}
+
+// ---------------------------------------------------------------- Archives
+
+void openArchive(BuildContext context) => Navigator.of(context)
+    .push(MaterialPageRoute<void>(builder: (_) => const ArchivePage()));
+
+/// Les tâches terminées archivées, rangées par sprint. On peut les consulter, les changer
+/// de sprint, les remettre à faire, ou vider les archives.
+class ArchivePage extends StatelessWidget {
+  const ArchivePage({super.key});
+
+  Future<void> _clear(BuildContext context) async {
+    final n = store.archived.length;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Vider les archives ?'),
+        content: Text(n == 1
+            ? 'La tâche archivée sera supprimée.'
+            : 'Les $n tâches archivées seront supprimées.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Annuler')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Vider')),
+        ],
+      ),
+    );
+    if (ok == true) store.clearArchive();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: ListenableBuilder(
+              listenable: store,
+              builder: (context, _) {
+                final groups = store.archiveBySprint;
+                return ListView(padding: const EdgeInsets.only(top: 8, bottom: 30), children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 0, 12, 6),
+                    child: Row(children: [
+                      IconButton(
+                          tooltip: 'Fermer',
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close)),
+                      Expanded(
+                        child: Text('Archives',
+                            style: TextStyle(
+                                fontSize: 24, fontWeight: FontWeight.w900, color: p.ink)),
+                      ),
+                      if (groups.isNotEmpty)
+                        OutlinedButton.icon(
+                            onPressed: () => _clear(context),
+                            style: OutlinedButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                foregroundColor: _statusColors['manque']),
+                            icon: const Icon(Icons.delete_outline, size: 18),
+                            label: const Text('Vider')),
+                    ]),
+                  ),
+                  if (groups.isEmpty)
+                    Panel(children: [
+                      Padding(
+                        padding: const EdgeInsets.all(26),
+                        child: Column(children: [
+                          Icon(Icons.inventory_2_outlined, size: 32, color: p.sub),
+                          const SizedBox(height: 10),
+                          Text('Les archives sont vides.',
+                              textAlign: TextAlign.center, style: TextStyle(color: p.sub)),
+                        ]),
+                      ),
+                    ]),
+                  for (final g in groups.entries)
+                    Panel(
+                      header: PanelHead('Sprint ${_range(dateOf(g.key))}',
+                          icon: Icons.flag_rounded,
+                          color: p.sub,
+                          subtitle:
+                              '${g.value.fold<double>(0, (a, t) => a + Store.pointsOf(t)).round()} pts',
+                          count: '${g.value.length}'),
+                      children: [for (final t in g.value) _Tile(t, key: ValueKey('a${t.id}'))],
+                    ),
+                ]);
+              },
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

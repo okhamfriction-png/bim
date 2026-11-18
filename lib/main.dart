@@ -36,6 +36,10 @@ ThemeData _theme(Pal p, Brightness b) => ThemeData(
       snackBarTheme: SnackBarThemeData(
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+      dialogTheme: DialogThemeData(
+          backgroundColor: p.card,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
       popupMenuTheme: PopupMenuThemeData(
           color: p.card,
           surfaceTintColor: Colors.transparent,

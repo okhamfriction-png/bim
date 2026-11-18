@@ -151,6 +151,52 @@ class Store extends ChangeNotifier {
       ..sort((a, b) => b.doneAt!.compareTo(a.doneAt!));
   }
 
+  // ---- Terminées et archives ----
+
+  /// Tâches terminées pas encore archivées, la plus récente d'abord.
+  List<Task> get finished =>
+      tasks.where((t) => !t.deleted && t.status == 'done' && !t.archived).toList()
+        ..sort((a, b) => (b.doneAt ?? 0).compareTo(a.doneAt ?? 0));
+
+  List<Task> get archived =>
+      tasks.where((t) => !t.deleted && t.status == 'done' && t.archived).toList()
+        ..sort((a, b) => (b.doneAt ?? 0).compareTo(a.doneAt ?? 0));
+
+  /// Le sprint d'une tâche archivée : celui où elle était rangée, sinon la semaine où
+  /// elle a été terminée.
+  String archiveSprint(Task t) =>
+      t.sprint ??
+      ymd(Schedule.mondayOf(DateTime.fromMillisecondsSinceEpoch(t.doneAt ?? t.updatedAt)));
+
+  /// Les archives rangées par sprint, le plus récent d'abord.
+  Map<String, List<Task>> get archiveBySprint {
+    final out = <String, List<Task>>{};
+    for (final t in archived) {
+      out.putIfAbsent(archiveSprint(t), () => []).add(t);
+    }
+    return {for (final k in out.keys.toList()..sort((a, b) => b.compareTo(a))) k: out[k]!};
+  }
+
+  /// Range toutes les tâches terminées dans les archives.
+  void archiveFinished() {
+    final now = nowMs();
+    for (final t in finished) {
+      t.archived = true;
+      t.updatedAt = now;
+    }
+    _changed();
+  }
+
+  /// Vide les archives.
+  void clearArchive() {
+    final now = nowMs();
+    for (final t in archived) {
+      t.deleted = true;
+      t.updatedAt = now;
+    }
+    _changed();
+  }
+
   /// Tâches faites depuis lundi.
   List<Task> get doneThisWeek {
     final m = Schedule.mondayOf(DateTime.now()).millisecondsSinceEpoch;
@@ -274,6 +320,7 @@ class Store extends ChangeNotifier {
   }
 
   void reopen(Task t) {
+    t.archived = false;
     t.doneAt = null;
     t.status = 'todo';
     touch(t);
@@ -289,6 +336,7 @@ class Store extends ChangeNotifier {
       t.doneAt = nowMs();
       t.status = 'done';
     } else if (!all && t.status == 'done') {
+      t.archived = false;
       t.doneAt = null;
       t.status = 'todo';
     }
@@ -373,7 +421,7 @@ class Store extends ChangeNotifier {
 
   void _purge() {
     final old = nowMs() - const Duration(days: 60).inMilliseconds;
-    tasks.removeWhere((t) => (t.deleted || t.status == 'done') && t.updatedAt < old);
+    tasks.removeWhere((t) => t.deleted && t.updatedAt < old);
   }
 
   /// Télécharge un fichier privé du dépôt de données (vidéo ou image jointe à une tâche).

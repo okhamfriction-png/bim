@@ -49,6 +49,7 @@ class Task {
   String? sprint; // lundi (aaaa-mm-jj) du sprint d'une semaine où elle est rangée
   bool deleted;
   List<Sub> subs; // sous-tâches (aucune pour une tâche simple)
+  bool archived; // tâche terminée rangée dans les archives
   String result; // résultat facultatif, montré dans la revue (« 2 venus »)
 
   Task({
@@ -70,6 +71,7 @@ class Task {
     this.deleted = false,
     List<Sub>? subs,
     this.result = '',
+    this.archived = false,
   })  : id = id ?? newId(),
         subs = subs ?? [],
         links = links ?? [],
@@ -97,6 +99,7 @@ class Task {
             .map((e) => Sub.fromJson(e as Map<String, dynamic>))
             .toList(),
         result: (j['result'] ?? '') as String,
+        archived: (j['archived'] ?? false) as bool,
       );
 
   Map<String, dynamic> toJson() => {
@@ -118,6 +121,7 @@ class Task {
         'deleted': deleted,
         if (subs.isNotEmpty) 'subs': [for (final s in subs) s.toJson()],
         if (result.isNotEmpty) 'result': result,
+        if (archived) 'archived': true,
       };
 
   /// Catégorie reconnue (les anciennes valeurs retombent sur Mission ou Personnel).
