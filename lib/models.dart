@@ -6,21 +6,27 @@ int nowMs() => DateTime.now().millisecondsSinceEpoch;
 String ymd(DateTime d) =>
     '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
+DateTime dateOf(String s) {
+  final p = s.split('-').map(int.parse).toList();
+  return DateTime(p[0], p[1], p[2]);
+}
+
 final _rnd = Random();
 String newId() {
   const c = 'abcdefghijklmnopqrstuvwxyz0123456789';
   return List.generate(8, (_) => c[_rnd.nextInt(c.length)]).join();
 }
 
+/// Catégories, dans l'ordre de priorité. Le Parking n'apparaît jamais dans Maintenant.
+const cats = ['Mission', 'Contenu', 'Destiny', 'Personnel', 'Parking'];
+
 /// Une tâche du backlog. Format partagé avec la commande `bin/bim`.
 class Task {
   String id;
   String title;
   String note;
-  String domain;
-  int priority; // 1 urgent, 2 important, 3 quand je peux
-  String? due; // aaaa-mm-jj
-  List<int> days; // jours de répétition (1 = lundi … 7 = dimanche), vide = une seule fois
+  String domain; // catégorie
+  int priority; // 1 haute, 2 normale, 3 basse (à l'intérieur de la catégorie)
   String source; // conversation ou agent qui a créé la tâche
   List<String> links; // liens, vidéos, images
   double rank;
@@ -28,18 +34,16 @@ class Task {
   int createdAt;
   int updatedAt;
   int? doneAt;
-  int? snoozeUntil;
-  int? startedAt;
+  String? pickedOn; // jour (aaaa-mm-jj) où elle a été choisie parmi les 3 tâches du jour
+  bool call; // appel ou entretien de mission : passe devant tout
   bool deleted;
 
   Task({
     String? id,
     required this.title,
     this.note = '',
-    this.domain = 'Perso',
+    this.domain = 'Mission',
     this.priority = 2,
-    this.due,
-    List<int>? days,
     this.source = '',
     List<String>? links,
     this.rank = 0,
@@ -47,11 +51,10 @@ class Task {
     int? createdAt,
     int? updatedAt,
     this.doneAt,
-    this.snoozeUntil,
-    this.startedAt,
+    this.pickedOn,
+    this.call = false,
     this.deleted = false,
   })  : id = id ?? newId(),
-        days = days ?? [],
         links = links ?? [],
         createdAt = createdAt ?? nowMs(),
         updatedAt = updatedAt ?? nowMs();
@@ -60,10 +63,8 @@ class Task {
         id: j['id'] as String,
         title: (j['title'] ?? '') as String,
         note: (j['note'] ?? '') as String,
-        domain: (j['domain'] ?? 'Perso') as String,
+        domain: (j['domain'] ?? 'Personnel') as String,
         priority: ((j['priority'] ?? 2) as num).toInt().clamp(1, 3),
-        due: j['due'] as String?,
-        days: ((j['days'] ?? []) as List).map((e) => (e as num).toInt()).toList(),
         source: (j['source'] ?? '') as String,
         links: ((j['links'] ?? []) as List).map((e) => '$e').toList(),
         rank: ((j['rank'] ?? 0) as num).toDouble(),
@@ -71,8 +72,8 @@ class Task {
         createdAt: ((j['createdAt'] ?? 0) as num).toInt(),
         updatedAt: ((j['updatedAt'] ?? 0) as num).toInt(),
         doneAt: (j['doneAt'] as num?)?.toInt(),
-        snoozeUntil: (j['snoozeUntil'] as num?)?.toInt(),
-        startedAt: (j['startedAt'] as num?)?.toInt(),
+        pickedOn: j['pickedOn'] as String?,
+        call: (j['call'] ?? false) as bool,
         deleted: (j['deleted'] ?? false) as bool,
       );
 
@@ -82,8 +83,6 @@ class Task {
         'note': note,
         'domain': domain,
         'priority': priority,
-        'due': due,
-        'days': days,
         'source': source,
         'links': links,
         'rank': rank,
@@ -91,54 +90,41 @@ class Task {
         'createdAt': createdAt,
         'updatedAt': updatedAt,
         'doneAt': doneAt,
-        'snoozeUntil': snoozeUntil,
-        'startedAt': startedAt,
+        'pickedOn': pickedOn,
+        'call': call,
         'deleted': deleted,
       };
 
-  bool get repeats => days.isNotEmpty;
-
+  /// Catégorie reconnue (les anciennes valeurs retombent sur Mission ou Personnel).
+  String get cat =>
+      cats.contains(domain) ? domain : (domain == 'Travail' ? 'Mission' : 'Personnel');
+  int get catRank => cats.indexOf(cat);
+  bool get parked => cat == 'Parking';
+  bool get open => !deleted && status == 'todo';
+  bool get pickedToday => pickedOn == ymd(DateTime.now());
   bool doneOn(DateTime d) =>
       doneAt != null && ymd(DateTime.fromMillisecondsSinceEpoch(doneAt!)) == ymd(d);
-
-  bool get snoozed => snoozeUntil != null && snoozeUntil! > nowMs();
-
-  /// Encore dans le backlog (prête ou en attente).
-  bool get open => !deleted && (repeats || status == 'todo');
-
-  /// À faire maintenant.
-  bool get ready {
-    if (!open || snoozed) return false;
-    final now = DateTime.now();
-    if (repeats) return days.contains(now.weekday) && !doneOn(now);
-    return true;
-  }
-
-  /// Priorité effective : 0 quand l'échéance est arrivée.
-  int get eff =>
-      (!repeats && due != null && due!.compareTo(ymd(DateTime.now())) <= 0) ? 0 : priority;
 }
 
-/// Un bloc de l'emploi du temps : rendez-vous fixe ou créneau backlog.
+/// Un élément récurrent de la semaine : bloc fixe à tenir, ou simple repère (contrainte enfants).
 class Block {
   String id;
   String week; // a | b | * (les deux)
-  List<int> days;
+  List<int> days; // 1 = lundi … 7 = dimanche
   int start; // minutes depuis minuit
   int end;
   String label;
-  bool fixed;
+  bool fixed; // true = bloc à tenir, false = repère affiché seulement
 
   Block({
-    String? id,
+    required this.id,
     this.week = '*',
     List<int>? days,
     this.start = 540,
     this.end = 720,
     this.label = '',
     this.fixed = true,
-  })  : id = id ?? newId(),
-        days = days ?? [1, 2, 3, 4, 5];
+  }) : days = days ?? [];
 
   factory Block.fromJson(Map<String, dynamic> j) => Block(
         id: j['id'] as String,
@@ -161,6 +147,20 @@ class Block {
       };
 }
 
+/// Un bloc fixe à une date précise (éventuellement déplacé ou raccourci).
+class Occ {
+  final Block block;
+  final String origDate; // date prévue au départ : sert d'identifiant avec le bloc
+  final String date; // date réelle
+  final int start;
+  final int end;
+  final bool moved;
+  Occ(this.block, this.origDate, this.date, this.start, this.end, this.moved);
+
+  String get key => '${block.id}|$origDate';
+  int get startMs => dateOf(date).add(Duration(minutes: start)).millisecondsSinceEpoch;
+}
+
 class Schedule {
   int updatedAt;
   String anchor; // un lundi de semaine A
@@ -168,13 +168,37 @@ class Schedule {
   String nameB;
   List<Block> blocks;
 
+  /// Dates ponctuelles : {id, date, start, label, blockId, cutEnd}.
+  /// `blockId` est le bloc raccourci ce jour-là, `cutEnd` l'heure choisie (minutes) ou null.
+  List<Map<String, dynamic>> events;
+
+  /// Blocs déplacés pour un entretien : {key, toDate, toStart}.
+  List<Map<String, dynamic>> moves;
+
+  /// Appuis sur « J'y suis » : clé du bloc → heure de l'appui (ms).
+  Map<String, int> checks;
+
+  String? reviewedOn; // dimanche de la dernière revue faite
+  int since; // les blocs commencés avant cet instant ne sont pas comptés
+
   Schedule({
     this.updatedAt = 0,
     this.anchor = '2026-01-05',
     this.nameA = 'Semaine A',
     this.nameB = 'Semaine B',
     List<Block>? blocks,
-  }) : blocks = blocks ?? [];
+    List<Map<String, dynamic>>? events,
+    List<Map<String, dynamic>>? moves,
+    Map<String, int>? checks,
+    this.reviewedOn,
+    this.since = 0,
+  })  : blocks = blocks ?? [],
+        events = events ?? [],
+        moves = moves ?? [],
+        checks = checks ?? {};
+
+  static List<Map<String, dynamic>> _maps(dynamic v) =>
+      ((v ?? []) as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
 
   factory Schedule.fromJson(Map<String, dynamic> j) => Schedule(
         updatedAt: ((j['updatedAt'] ?? 0) as num).toInt(),
@@ -184,6 +208,12 @@ class Schedule {
         blocks: ((j['blocks'] ?? []) as List)
             .map((e) => Block.fromJson(e as Map<String, dynamic>))
             .toList(),
+        events: _maps(j['events']),
+        moves: _maps(j['moves']),
+        checks: ((j['checks'] ?? {}) as Map)
+            .map((k, v) => MapEntry('$k', (v as num).toInt())),
+        reviewedOn: j['reviewedOn'] as String?,
+        since: ((j['since'] ?? 0) as num).toInt(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -194,24 +224,95 @@ class Schedule {
         'blocks': (blocks.toList()..sort((a, b) => a.id.compareTo(b.id)))
             .map((b) => b.toJson())
             .toList(),
+        'events': events,
+        'moves': moves,
+        'checks': Map.fromEntries(
+            checks.entries.toList()..sort((a, b) => a.key.compareTo(b.key))),
+        'reviewedOn': reviewedOn,
+        'since': since,
       };
 
   static DateTime mondayOf(DateTime d) =>
-      DateTime.utc(d.year, d.month, d.day).subtract(Duration(days: d.weekday - 1));
+      DateTime(d.year, d.month, d.day - (d.weekday - 1));
 
   String weekOf(DateTime d) {
-    final p = anchor.split('-').map(int.parse).toList();
-    final a = mondayOf(DateTime.utc(p[0], p[1], p[2]));
-    final w = (mondayOf(d).difference(a).inDays / 7).round();
+    final a = mondayOf(dateOf(anchor));
+    final m = mondayOf(d);
+    final w = (DateTime.utc(m.year, m.month, m.day)
+                .difference(DateTime.utc(a.year, a.month, a.day))
+                .inDays /
+            7)
+        .round();
     return w.isEven ? 'a' : 'b';
   }
 
   String nameOf(String w) => w == 'a' ? nameA : nameB;
 
-  List<Block> blocksFor(String week, int day) => blocks
-      .where((b) => (b.week == '*' || b.week == week) && b.days.contains(day))
-      .toList()
-    ..sort((a, b) => a.start.compareTo(b.start));
+  bool _on(Block b, DateTime day) =>
+      (b.week == '*' || b.week == weekOf(day)) && b.days.contains(day.weekday);
+
+  /// Les blocs fixes d'un jour, déplacements et dates ponctuelles appliqués.
+  List<Occ> occs(DateTime day) {
+    final d = ymd(day);
+    final out = <Occ>[];
+    int cut(Block b, int end) {
+      for (final e in events) {
+        if (e['date'] == d && e['blockId'] == b.id && e['cutEnd'] != null) {
+          final c = (e['cutEnd'] as num).toInt();
+          if (c < end) return c;
+        }
+      }
+      return end;
+    }
+
+    for (final b in blocks.where((b) => b.fixed && _on(b, day))) {
+      if (moves.any((m) => m['key'] == '${b.id}|$d')) continue;
+      final end = cut(b, b.end);
+      if (end > b.start) out.add(Occ(b, d, d, b.start, end, false));
+    }
+    for (final m in moves.where((m) => m['toDate'] == d)) {
+      final parts = (m['key'] as String).split('|');
+      final b = blocks.where((b) => b.id == parts[0]).firstOrNull;
+      if (b == null) continue;
+      final s = (m['toStart'] as num).toInt();
+      out.add(Occ(b, parts[1], d, s, s + (b.end - b.start), true));
+    }
+    return out..sort((a, b) => a.start.compareTo(b.start));
+  }
+
+  /// Les repères d'un jour (contraintes enfants) : affichés, jamais comptés.
+  List<Block> hints(DateTime day) =>
+      blocks.where((b) => !b.fixed && _on(b, day)).toList()
+        ..sort((a, b) => a.start.compareTo(b.start));
+
+  List<Map<String, dynamic>> eventsOn(DateTime day) =>
+      events.where((e) => e['date'] == ymd(day)).toList();
+
+  /// tenu | manque | ouvert (dans les 15 premières minutes) | attente (pas encore l'heure)
+  /// | hors (bloc d'avant la mise en place, non compté).
+  String statusOf(Occ o) {
+    const grace = 15 * 60000;
+    final c = checks[o.key];
+    if (c != null && c <= o.startMs + grace) return 'tenu';
+    if (o.startMs < since) return 'hors';
+    final now = nowMs();
+    if (now < o.startMs) return 'attente';
+    return now <= o.startMs + grace ? 'ouvert' : 'manque';
+  }
+
+  /// Compte de la semaine qui commence ce lundi : (tenus, prévus).
+  (int, int) count(DateTime monday) {
+    var held = 0, planned = 0;
+    for (var i = 0; i < 7; i++) {
+      for (final o in occs(DateTime(monday.year, monday.month, monday.day + i))) {
+        final st = statusOf(o);
+        if (st == 'hors') continue;
+        planned++;
+        if (st == 'tenu') held++;
+      }
+    }
+    return (held, planned);
+  }
 }
 
 class Doc {
@@ -227,7 +328,7 @@ class Doc {
       );
 
   String encode() => const JsonEncoder.withIndent(' ').convert({
-        'version': 1,
+        'version': 2,
         'tasks': (tasks.toList()..sort((a, b) => a.id.compareTo(b.id)))
             .map((t) => t.toJson())
             .toList(),

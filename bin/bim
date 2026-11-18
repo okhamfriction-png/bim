@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """bim — ajoute et consulte les tâches du backlog Bim depuis un terminal ou une session Claude.
 
-  bim add "Titre" [-p 1|2|3] [-d Domaine] [--due AAAA-MM-JJ] [--days 1,3,5] [--source …]
+  bim add "Titre" [-d Mission|Contenu|Destiny|Personnel|Parking] [-p 1|2|3] [--call] [--source …]
           [--note "descriptif" | --note-file script.md] [--link URL]… [--file video.mp4]…
   bim rm <début du titre ou de l'identifiant>
   bim list
@@ -22,8 +22,8 @@ import subprocess
 import sys
 import time
 
-DOMAINS = ["Travail", "Contenu", "Destiny", "Projets", "Sport", "Famille", "Perso"]
-PRIO = {0: "échéance", 1: "urgent", 2: "important", 3: "quand je peux"}
+DOMAINS = ["Mission", "Contenu", "Destiny", "Personnel", "Parking"]
+PRIO = {1: "haute", 2: "normale", 3: "basse"}
 
 
 def gh(*args, body=None):
@@ -94,25 +94,21 @@ def now_ms():
 
 
 def is_open(t):
-    return not t.get("deleted") and (t.get("days") or t.get("status") == "todo")
+    return not t.get("deleted") and t.get("status") == "todo"
 
 
-def eff(t):
-    due = t.get("due")
-    if due and not t.get("days") and due <= datetime.date.today().isoformat():
-        return 0
-    return t.get("priority", 2)
+def cat(t):
+    d = t.get("domain", "Personnel")
+    return d if d in DOMAINS else ("Mission" if d == "Travail" else "Personnel")
+
+
+def order(t):
+    return (DOMAINS.index(cat(t)), t.get("priority", 2), t.get("rank", 0))
 
 
 def cmd_add(a):
     if a.domain not in DOMAINS:
         sys.exit(f"Domaine inconnu. Choix : {', '.join(DOMAINS)}")
-    if a.due:
-        datetime.date.fromisoformat(a.due)
-    days = sorted({int(d) for d in a.days.split(",")}) if a.days else []
-    if any(d < 1 or d > 7 for d in days):
-        sys.exit("--days attend des jours de 1 (lundi) à 7 (dimanche)")
-
     note = a.note
     if a.note_file:
         with open(a.note_file, encoding="utf-8") as f:
@@ -135,40 +131,38 @@ def cmd_add(a):
             "links": links,
             "domain": a.domain,
             "priority": a.priority,
-            "due": a.due,
-            "days": days,
             "source": a.source,
             "rank": max([x.get("rank", 0) for x in tasks] + [0]) + 1,
             "status": "todo",
             "createdAt": now_ms(),
             "updatedAt": now_ms(),
             "doneAt": None,
-            "snoozeUntil": None,
-            "startedAt": None,
+            "pickedOn": None,
+            "call": bool(a.call) and a.domain == "Mission",
             "deleted": False,
         }
         tasks.append(t)
         return t
 
     t = change(fn, f"bim : + {a.title.strip()[:60]}")
-    print(f"Ajoutée ({PRIO[a.priority]}, {a.domain}) : {a.title}" if t
+    print(f"Ajoutée ({a.domain}, priorité {PRIO[a.priority]}) : {a.title}" if t
           else f"Déjà dans le backlog : {a.title}")
 
 
 def cmd_list(_):
     doc, _sha = load(f"repos/{repo()}/contents/backlog.json")
-    tasks = sorted((t for t in doc.get("tasks", []) if is_open(t)),
-                   key=lambda t: (eff(t), t.get("rank", 0)))
+    tasks = sorted((t for t in doc.get("tasks", []) if is_open(t)), key=order)
     if not tasks:
         print("Backlog vide.")
+    today = datetime.date.today().isoformat()
     for t in tasks:
         extra = " · ".join(x for x in [
-            t.get("domain", ""),
-            f"échéance {t['due']}" if t.get("due") else "",
-            "rituel" if t.get("days") else "",
+            f"priorité {PRIO[t.get('priority', 2)]}",
+            "appel ou entretien" if t.get("call") else "",
+            "choisie aujourd'hui" if t.get("pickedOn") == today else "",
             f"via {t['source']}" if t.get("source") else "",
         ] if x)
-        print(f"{t['id']}  [{PRIO[eff(t)]}] {t['title']}  ({extra})")
+        print(f"{t['id']}  [{cat(t)}] {t['title']}  ({extra})")
 
 
 def cmd_done(a):
@@ -181,9 +175,7 @@ def cmd_done(a):
             return hits
         t = hits[0]
         t["doneAt"] = t["updatedAt"] = now_ms()
-        t["startedAt"] = t["snoozeUntil"] = None
-        if not t.get("days"):
-            t["status"] = "done"
+        t["status"] = "done"
         return hits
 
     hits = change(fn, f"bim : fait {a.key[:60]}")
@@ -219,9 +211,10 @@ def main():
     a = sub.add_parser("add", help="ajouter une tâche")
     a.add_argument("title")
     a.add_argument("-p", "--priority", type=int, choices=[1, 2, 3], default=2)
-    a.add_argument("-d", "--domain", default="Perso")
-    a.add_argument("--due")
-    a.add_argument("--days")
+    a.add_argument("-d", "--domain", default="Personnel",
+                   help="catégorie : " + ", ".join(DOMAINS))
+    a.add_argument("--call", action="store_true",
+                   help="appel ou entretien de mission : passe devant tout (catégorie Mission)")
     a.add_argument("--note", default="", help="descriptif affiché quand on déplie la tâche")
     a.add_argument("--note-file", help="fichier texte à mettre en descriptif (script, plan…)")
     a.add_argument("--link", action="append", help="lien, vidéo (.mp4) ou image ; répétable")

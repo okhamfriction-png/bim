@@ -132,15 +132,6 @@ class _ShellState extends State<Shell> {
             ),
           ),
         ),
-        floatingActionButton: tab != 1
-            ? null
-            : FloatingActionButton(
-                tooltip: 'Nouvelle tâche',
-                backgroundColor: p.ink,
-                foregroundColor: p.bg,
-                onPressed: () => sheet(context, const TaskSheet()),
-                child: const Icon(Icons.add, size: 30),
-              ),
         bottomNavigationBar: NavigationBar(
           selectedIndex: tab,
           onDestinationSelected: (i) => setState(() => tab = i),

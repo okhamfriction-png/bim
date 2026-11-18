@@ -22,27 +22,23 @@ class Pal {
       Theme.of(c).brightness == Brightness.dark ? dark : light;
 }
 
-const prioColors = [Color(0xFFEF4444), Color(0xFFF97316), Color(0xFF3B82F6), Color(0xFF94A3B8)];
-const prioNames = ['Échéance', 'Urgent', 'Important', 'Quand je peux'];
+const prioColors = [Color(0xFF94A3B8), Color(0xFFF97316), Color(0xFF3B82F6), Color(0xFF94A3B8)];
+const prioNames = ['', 'Haute', 'Normale', 'Basse'];
 
 const domains = <String, Color>{
-  'Travail': Color(0xFF3B82F6),
+  'Mission': Color(0xFF3B82F6),
   'Contenu': Color(0xFFF59E0B),
   'Destiny': Color(0xFFA855F7),
-  'Projets': Color(0xFF14B8A6),
-  'Sport': Color(0xFF22C55E),
-  'Famille': Color(0xFFEC4899),
-  'Perso': Color(0xFF84CC16),
+  'Personnel': Color(0xFF22C55E),
+  'Parking': Color(0xFF94A3B8),
 };
 
 const domainIcons = <String, IconData>{
-  'Travail': Icons.work_rounded,
+  'Mission': Icons.work_rounded,
   'Contenu': Icons.videocam_rounded,
   'Destiny': Icons.theater_comedy_rounded,
-  'Projets': Icons.build_rounded,
-  'Sport': Icons.fitness_center_rounded,
-  'Famille': Icons.favorite_rounded,
-  'Perso': Icons.spa_rounded,
+  'Personnel': Icons.menu_book_rounded,
+  'Parking': Icons.local_parking_rounded,
 };
 
 IconData iconOf(String d) => domainIcons[d] ?? Icons.label_rounded;
@@ -68,17 +64,6 @@ String dur(int minutes) {
   if (minutes < 60) return '$minutes min';
   final m = minutes % 60;
   return m == 0 ? '${minutes ~/ 60} h' : '${minutes ~/ 60} h ${m.toString().padLeft(2, '0')}';
-}
-
-String dueLabel(String due) {
-  final p = due.split('-').map(int.parse).toList();
-  final d = DateTime(p[0], p[1], p[2]);
-  final n = DateTime.now();
-  final diff = d.difference(DateTime(n.year, n.month, n.day)).inDays;
-  if (diff < 0) return 'en retard';
-  if (diff == 0) return 'aujourd\'hui';
-  if (diff == 1) return 'demain';
-  return '${d.day} ${monthNames[d.month - 1]}';
 }
 
 class Pill extends StatelessWidget {
@@ -174,9 +159,8 @@ class _TaskSheetState extends State<TaskSheet> {
   late final note = TextEditingController(text: widget.task?.note ?? '');
   late final links = TextEditingController(text: (widget.task?.links ?? []).join('\n'));
   late int priority = widget.task?.priority ?? 2;
-  late String domain = widget.task?.domain ?? 'Perso';
-  late String? due = widget.task?.due;
-  late List<int> days = [...?widget.task?.days];
+  late String domain = widget.task?.cat ?? 'Mission';
+  late bool call = widget.task?.call ?? false;
   late bool more = widget.task != null;
 
   void save() {
@@ -184,15 +168,15 @@ class _TaskSheetState extends State<TaskSheet> {
     if (s.isEmpty) return;
     final t = widget.task;
     final ls = links.text.split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    final isCall = call && domain == 'Mission';
     if (t == null) {
       store.add(Task(
-          links: ls,
           title: s,
           note: note.text.trim(),
+          links: ls,
           priority: priority,
           domain: domain,
-          due: due,
-          days: days));
+          call: isCall));
     } else {
       t
         ..title = s
@@ -200,8 +184,8 @@ class _TaskSheetState extends State<TaskSheet> {
         ..links = ls
         ..priority = priority
         ..domain = domain
-        ..due = due
-        ..days = days;
+        ..call = isCall;
+      if (domain == 'Parking') t.pickedOn = null;
       store.touch(t);
     }
     Navigator.pop(context);
@@ -211,7 +195,6 @@ class _TaskSheetState extends State<TaskSheet> {
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final t = widget.task;
-    final today = DateTime.now();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
       TextField(
         controller: title,
@@ -224,27 +207,34 @@ class _TaskSheetState extends State<TaskSheet> {
       ),
       if (t != null && t.source.isNotEmpty)
         Text('Ajoutée par ${t.source}', style: TextStyle(color: p.sub, fontSize: 13)),
+      _label(context, 'CATÉGORIE'),
+      Wrap(spacing: 8, runSpacing: 8, children: [
+        for (final d in domains.entries)
+          Pick(d.key, domain == d.key, () => setState(() => domain = d.key),
+              color: d.value, icon: iconOf(d.key)),
+      ]),
       _label(context, 'PRIORITÉ'),
       Wrap(spacing: 8, runSpacing: 8, children: [
         for (var i = 1; i <= 3; i++)
           Pick(prioNames[i], priority == i, () => setState(() => priority = i),
               color: prioColors[i]),
       ]),
-      _label(context, 'DOMAINE'),
-      Wrap(spacing: 8, runSpacing: 8, children: [
-        for (final d in domains.entries)
-          Pick(d.key, domain == d.key, () => setState(() => domain = d.key),
-              color: d.value, icon: iconOf(d.key)),
-      ]),
+      if (domain == 'Mission')
+        Padding(
+          padding: const EdgeInsets.only(top: 14),
+          child: Pick('Appel ou entretien : passe devant tout', call,
+              () => setState(() => call = !call),
+              icon: Icons.phone_in_talk_rounded, color: domains['Mission']),
+        ),
       if (!more)
         Padding(
           padding: const EdgeInsets.only(top: 10),
           child: TextButton(
               onPressed: () => setState(() => more = true),
-              child: const Text('Note, échéance, répétition…')),
+              child: const Text('Descriptif, liens…')),
         ),
       if (more) ...[
-        _label(context, 'NOTE'),
+        _label(context, 'DESCRIPTIF'),
         TextField(
           controller: note,
           minLines: 1,
@@ -263,32 +253,6 @@ class _TaskSheetState extends State<TaskSheet> {
           decoration: InputDecoration(
               hintText: 'Une adresse par ligne', isDense: true, hintStyle: TextStyle(color: p.sub)),
         ),
-        _label(context, 'ÉCHÉANCE'),
-        Wrap(spacing: 8, runSpacing: 8, children: [
-          Pick('Aucune', due == null, () => setState(() => due = null)),
-          Pick('Aujourd\'hui', due == ymd(today), () => setState(() => due = ymd(today))),
-          Pick('Demain', due == ymd(today.add(const Duration(days: 1))),
-              () => setState(() => due = ymd(today.add(const Duration(days: 1))))),
-          Pick(
-              due != null && dueLabel(due!) != 'aujourd\'hui' && dueLabel(due!) != 'demain'
-                  ? cap(dueLabel(due!))
-                  : 'Choisir…',
-              due != null && dueLabel(due!) != 'aujourd\'hui' && dueLabel(due!) != 'demain',
-              () async {
-            final d = await showDatePicker(
-                context: context,
-                firstDate: today.subtract(const Duration(days: 30)),
-                lastDate: today.add(const Duration(days: 730)),
-                initialDate: today);
-            if (d != null) setState(() => due = ymd(d));
-          }),
-        ]),
-        _label(context, 'REVIENT CHAQUE'),
-        Wrap(spacing: 8, children: [
-          for (var i = 1; i <= 7; i++)
-            Pick(dayLetters[i - 1], days.contains(i),
-                () => setState(() => days.contains(i) ? days.remove(i) : days.add(i))),
-        ]),
       ],
       const SizedBox(height: 22),
       Row(children: [
@@ -300,7 +264,7 @@ class _TaskSheetState extends State<TaskSheet> {
                 Navigator.pop(context);
               },
               icon: const Icon(Icons.delete_outline)),
-        if (t != null && (t.status == 'done' || t.doneOn(today)))
+        if (t != null && t.status == 'done')
           TextButton(
               onPressed: () {
                 store.reopen(t);
@@ -315,39 +279,6 @@ class _TaskSheetState extends State<TaskSheet> {
             child: Text(t == null ? 'Ajouter' : 'Enregistrer',
                 style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
       ]),
-    ]);
-  }
-}
-
-/// Reporter une tâche.
-class SnoozeSheet extends StatelessWidget {
-  final Task task;
-  const SnoozeSheet(this.task, {super.key});
-  @override
-  Widget build(BuildContext context) {
-    final n = DateTime.now();
-    final tomorrow = DateTime(n.year, n.month, n.day + 1, 6);
-    final opts = <(String, DateTime)>[
-      ('Dans 1 heure', n.add(const Duration(hours: 1))),
-      if (n.hour < 13) ('Cet après-midi', DateTime(n.year, n.month, n.day, 14)),
-      if (n.hour < 19) ('Ce soir', DateTime(n.year, n.month, n.day, 20)),
-      ('Demain', tomorrow),
-      ('Lundi prochain', DateTime(n.year, n.month, n.day + (8 - n.weekday), 6)),
-    ];
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
-      const Text('Elle revient quand ?',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-      const SizedBox(height: 12),
-      for (final o in opts)
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(o.$1, style: const TextStyle(fontWeight: FontWeight.w600)),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            store.snooze(task, o.$2);
-            Navigator.pop(context);
-          },
-        ),
     ]);
   }
 }

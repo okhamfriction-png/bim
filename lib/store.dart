@@ -9,7 +9,7 @@ import 'models.dart';
 
 final store = Store();
 
-/// État de l'appli : backlog, emploi du temps, sauvegarde locale et synchro GitHub.
+/// État de l'appli : backlog, blocs fixes, sauvegarde locale et synchro GitHub.
 class Store extends ChangeNotifier {
   List<Task> tasks = [];
   Schedule schedule = Schedule();
@@ -56,23 +56,55 @@ class Store extends ChangeNotifier {
 
   // ---- Lecture ----
 
+  /// Ordre du backlog : catégorie (Mission d'abord), puis priorité, puis ancienneté.
   static int _order(Task a, Task b) {
-    final p = a.eff.compareTo(b.eff);
+    final c = a.catRank.compareTo(b.catRank);
+    if (c != 0) return c;
+    final p = a.priority.compareTo(b.priority);
     return p != 0 ? p : a.rank.compareTo(b.rank);
   }
 
-  List<Task> get ready => tasks.where((t) => t.ready).toList()..sort(_order);
+  /// Tout le backlog ouvert, Parking compris.
+  List<Task> get backlog => tasks.where((t) => t.open).toList()..sort(_order);
 
-  List<Task> get waiting =>
-      tasks.where((t) => t.open && !t.ready).toList()..sort(_order);
+  /// Les tâches choisies pour aujourd'hui (3 au maximum), faites ou non.
+  List<Task> get picks =>
+      tasks.where((t) => !t.deleted && t.pickedToday).toList()..sort(_order);
+
+  /// Celles qu'il reste à faire aujourd'hui.
+  List<Task> get todayTodo => picks.where((t) => t.open && !t.parked).toList();
+
+  /// Appels et entretiens de mission : ils passent devant tout.
+  List<Task> get calls => backlog.where((t) => t.call && !t.parked).toList();
+
+  /// Ce qu'on peut encore choisir pour aujourd'hui.
+  List<Task> get pickable =>
+      backlog.where((t) => !t.parked && !t.pickedToday && !t.call).toList();
+
+  bool get canPick => picks.length < 3;
 
   List<Task> get doneToday {
     final now = DateTime.now();
-    return tasks.where((t) => !t.deleted && t.doneOn(now)).toList()
+    return tasks.where((t) => !t.deleted && t.status == 'done' && t.doneOn(now)).toList()
       ..sort((a, b) => b.doneAt!.compareTo(a.doneAt!));
   }
 
-  // ---- Écriture ----
+  /// Tâches faites depuis lundi.
+  List<Task> get doneThisWeek {
+    final m = Schedule.mondayOf(DateTime.now()).millisecondsSinceEpoch;
+    return tasks
+        .where((t) => !t.deleted && t.status == 'done' && (t.doneAt ?? 0) >= m)
+        .toList()
+      ..sort((a, b) => b.doneAt!.compareTo(a.doneAt!));
+  }
+
+  /// Tâches ouvertes (hors Parking) jamais touchées depuis 7 jours.
+  List<Task> get stale {
+    final limit = nowMs() - const Duration(days: 7).inMilliseconds;
+    return backlog.where((t) => !t.parked && t.updatedAt < limit).toList();
+  }
+
+  // ---- Tâches ----
 
   void _changed() {
     notifyListeners();
@@ -81,11 +113,8 @@ class Store extends ChangeNotifier {
     _debounce = Timer(const Duration(seconds: 2), sync);
   }
 
-  double _endRank() =>
-      tasks.fold<double>(0, (m, t) => t.rank > m ? t.rank : m) + 1;
-
   void add(Task t) {
-    t.rank = _endRank();
+    t.rank = tasks.fold<double>(0, (m, x) => x.rank > m ? x.rank : m) + 1;
     tasks.add(t);
     _changed();
   }
@@ -97,9 +126,7 @@ class Store extends ChangeNotifier {
 
   void complete(Task t) {
     t.doneAt = nowMs();
-    t.startedAt = null;
-    t.snoozeUntil = null;
-    if (!t.repeats) t.status = 'done';
+    t.status = 'done';
     touch(t);
   }
 
@@ -109,19 +136,21 @@ class Store extends ChangeNotifier {
     touch(t);
   }
 
-  void snooze(Task t, DateTime until) {
-    t.snoozeUntil = until.millisecondsSinceEpoch;
-    t.startedAt = null;
+  void pick(Task t) {
+    if (!canPick || t.parked) return;
+    t.pickedOn = ymd(DateTime.now());
     touch(t);
   }
 
-  void wake(Task t) {
-    t.snoozeUntil = null;
+  void unpick(Task t) {
+    t.pickedOn = null;
     touch(t);
   }
 
-  void start(Task t) {
-    t.startedAt = t.startedAt == null ? nowMs() : null;
+  void park(Task t) {
+    t.domain = 'Parking';
+    t.pickedOn = null;
+    t.call = false;
     touch(t);
   }
 
@@ -130,37 +159,40 @@ class Store extends ChangeNotifier {
     touch(t);
   }
 
-  /// Déplace une tâche dans la liste « prêtes » : elle prend la priorité de sa voisine.
-  void reorder(int from, int to) {
-    final list = ready;
-    if (to > from) to -= 1;
-    final t = list.removeAt(from);
-    list.insert(to, t);
-    final prev = to > 0 ? list[to - 1] : null;
-    final next = to < list.length - 1 ? list[to + 1] : null;
-    final target = ((prev ?? next)?.eff ?? t.priority).clamp(1, 3);
-    final lo = (prev != null && prev.eff == target) ? prev.rank : null;
-    final hi = (next != null && next.eff == target) ? next.rank : null;
-    t.priority = target;
-    if (lo != null && hi != null) {
-      t.rank = (lo + hi) / 2;
-    } else if (lo != null) {
-      t.rank = lo + 1;
-    } else if (hi != null) {
-      t.rank = hi - 1;
-    }
-    touch(t);
-  }
+  // ---- Blocs ----
 
-  void saveSchedule() {
+  void _saveSchedule() {
     schedule.updatedAt = nowMs();
     _changed();
   }
 
+  /// « J'y suis » : enregistre l'heure de l'appui.
+  void check(Occ o) {
+    schedule.checks[o.key] = nowMs();
+    _saveSchedule();
+  }
+
+  /// Heure de fin choisie pour le bloc raccourci par une date ponctuelle.
+  void setCut(Map<String, dynamic> event, int minutes) {
+    event['cutEnd'] = minutes;
+    _saveSchedule();
+  }
+
+  /// Déplace un bloc dans la même semaine (entretien de mission à son heure).
+  void move(Occ o, String toDate, int toStart) {
+    schedule.moves.removeWhere((m) => m['key'] == o.key);
+    schedule.moves.add({'key': o.key, 'toDate': toDate, 'toStart': toStart});
+    _saveSchedule();
+  }
+
+  void reviewed() {
+    schedule.reviewedOn = ymd(DateTime.now());
+    _saveSchedule();
+  }
+
   void _purge() {
     final old = nowMs() - const Duration(days: 60).inMilliseconds;
-    tasks.removeWhere((t) =>
-        (t.deleted || (t.status == 'done' && !t.repeats)) && t.updatedAt < old);
+    tasks.removeWhere((t) => (t.deleted || t.status == 'done') && t.updatedAt < old);
   }
 
   /// Télécharge un fichier privé du dépôt de données (vidéo ou image jointe à une tâche).
@@ -227,7 +259,7 @@ class Store extends ChangeNotifier {
             body: jsonEncode({
               'message': 'bim : synchro',
               'content': base64.encode(utf8.encode(mine)),
-              if (sha != null) 'sha': sha,
+              'sha': ?sha,
             }));
         if (p.statusCode == 200 || p.statusCode == 201) break;
         if (p.statusCode != 409 && p.statusCode != 422) {
