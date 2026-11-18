@@ -107,15 +107,9 @@ class _ShellState extends State<Shell> {
                         icon: Icon(Icons.add_circle, color: p.ink, size: 30),
                       ),
                     IconButton(
-                      tooltip: 'Synchronisation',
+                      tooltip: 'Réglages',
                       onPressed: () => sheet(context, const SyncSheet()),
-                      icon: Icon(
-                          switch (store.syncState) {
-                            'ok' => Icons.cloud_done_outlined,
-                            'sync' => Icons.cloud_sync_outlined,
-                            'error' => Icons.cloud_off_outlined,
-                            _ => Icons.cloud_outlined,
-                          },
+                      icon: Icon(Icons.settings_rounded,
                           color: store.syncState == 'error' ? prioColors[0] : p.sub),
                     ),
                   ]),
@@ -125,7 +119,7 @@ class _ShellState extends State<Shell> {
                     // Non const : chaque écran se redessine quand le store change.
                     NowScreen(key: const ValueKey('now')),
                     BacklogScreen(key: const ValueKey('backlog')),
-                    WeekScreen(key: const ValueKey('week')),
+                    AgendaScreen(key: const ValueKey('agenda')),
                   ]),
                 ),
               ]),
@@ -138,7 +132,7 @@ class _ShellState extends State<Shell> {
           destinations: const [
             NavigationDestination(icon: Icon(Icons.bolt_rounded), label: 'Maintenant'),
             NavigationDestination(icon: Icon(Icons.format_list_bulleted_rounded), label: 'Backlog'),
-            NavigationDestination(icon: Icon(Icons.calendar_view_week_rounded), label: 'Semaine'),
+            NavigationDestination(icon: Icon(Icons.calendar_month_rounded), label: 'Agenda'),
           ],
         ),
       ),

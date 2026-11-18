@@ -22,8 +22,14 @@ class Pal {
       Theme.of(c).brightness == Brightness.dark ? dark : light;
 }
 
-const prioColors = [Color(0xFF94A3B8), Color(0xFFF97316), Color(0xFF3B82F6), Color(0xFF94A3B8)];
-const prioNames = ['', 'Haute', 'Normale', 'Basse'];
+const prioColors = [
+  Color(0xFFEF4444),
+  Color(0xFFF97316),
+  Color(0xFF3B82F6),
+  Color(0xFF64748B),
+  Color(0xFFCBD5E1),
+];
+const prioNames = ['P0', 'P1', 'P2', 'P3', 'P4'];
 
 const domains = <String, Color>{
   'Mission': Color(0xFF3B82F6),
@@ -215,7 +221,7 @@ class _TaskSheetState extends State<TaskSheet> {
       ]),
       _label(context, 'PRIORITÉ'),
       Wrap(spacing: 8, runSpacing: 8, children: [
-        for (var i = 1; i <= 3; i++)
+        for (var i = 0; i <= 4; i++)
           Pick(prioNames[i], priority == i, () => setState(() => priority = i),
               color: prioColors[i]),
       ]),
@@ -299,9 +305,18 @@ class _SyncSheetState extends State<SyncSheet> {
     return ListenableBuilder(
       listenable: store,
       builder: (context, _) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
-        const Text('Synchronisation',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 6),
+        const Text('Réglages', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+        _label(context, 'VUE DE L\'AGENDA À L\'OUVERTURE'),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          for (final v in const [
+            ('jour', 'Jour'),
+            ('semaine', 'Semaine'),
+            ('mois', 'Mois'),
+            ('annee', 'Année')
+          ])
+            Pick(v.$2, store.agendaView == v.$1, () => store.setAgendaView(v.$1)),
+        ]),
+        _label(context, 'SYNCHRONISATION'),
         Text(
             'Le backlog vit dans un fichier d\'un dépôt GitHub privé. Le téléphone, le web et tes sessions Claude lisent et écrivent le même.',
             style: TextStyle(color: p.sub)),

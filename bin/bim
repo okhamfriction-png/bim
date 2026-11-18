@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """bim — ajoute et consulte les tâches du backlog Bim depuis un terminal ou une session Claude.
 
-  bim add "Titre" [-d Mission|Contenu|Destiny|Personnel|Parking] [-p 1|2|3] [--call] [--source …]
+  bim add "Titre" [-d Mission|Contenu|Destiny|Personnel|Parking] [-p 0|1|2|3|4] [--call] [--source …]
           [--note "descriptif" | --note-file script.md] [--link URL]… [--file video.mp4]…
   bim rm <début du titre ou de l'identifiant>
   bim list
@@ -23,7 +23,7 @@ import sys
 import time
 
 DOMAINS = ["Mission", "Contenu", "Destiny", "Personnel", "Parking"]
-PRIO = {1: "haute", 2: "normale", 3: "basse"}
+PRIO = {i: f"P{i}" for i in range(5)}
 
 
 def gh(*args, body=None):
@@ -103,7 +103,7 @@ def cat(t):
 
 
 def order(t):
-    return (DOMAINS.index(cat(t)), t.get("priority", 2), t.get("rank", 0))
+    return (t.get("priority", 2), DOMAINS.index(cat(t)), t.get("rank", 0))
 
 
 def cmd_add(a):
@@ -145,7 +145,7 @@ def cmd_add(a):
         return t
 
     t = change(fn, f"bim : + {a.title.strip()[:60]}")
-    print(f"Ajoutée ({a.domain}, priorité {PRIO[a.priority]}) : {a.title}" if t
+    print(f"Ajoutée ({a.domain}, {PRIO[a.priority]}) : {a.title}" if t
           else f"Déjà dans le backlog : {a.title}")
 
 
@@ -157,7 +157,7 @@ def cmd_list(_):
     today = datetime.date.today().isoformat()
     for t in tasks:
         extra = " · ".join(x for x in [
-            f"priorité {PRIO[t.get('priority', 2)]}",
+            PRIO[t.get('priority', 2)],
             "appel ou entretien" if t.get("call") else "",
             "choisie aujourd'hui" if t.get("pickedOn") == today else "",
             f"via {t['source']}" if t.get("source") else "",
@@ -210,7 +210,8 @@ def main():
     sub = p.add_subparsers(dest="cmd", required=True)
     a = sub.add_parser("add", help="ajouter une tâche")
     a.add_argument("title")
-    a.add_argument("-p", "--priority", type=int, choices=[1, 2, 3], default=2)
+    a.add_argument("-p", "--priority", type=int, choices=[0, 1, 2, 3, 4], default=2,
+                   help="P0 (le plus urgent) à P4")
     a.add_argument("-d", "--domain", default="Personnel",
                    help="catégorie : " + ", ".join(DOMAINS))
     a.add_argument("--call", action="store_true",

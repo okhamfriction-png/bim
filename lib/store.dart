@@ -16,6 +16,7 @@ class Store extends ChangeNotifier {
 
   String repo = '';
   String token = '';
+  String agendaView = 'semaine'; // vue de l'agenda à l'ouverture : jour | semaine | mois | annee
   String syncState = 'off'; // off | sync | ok | error
   String syncError = '';
   int? lastSync;
@@ -28,6 +29,7 @@ class Store extends ChangeNotifier {
     _prefs = await SharedPreferences.getInstance();
     repo = _prefs.getString('repo') ?? '';
     token = _prefs.getString('token') ?? '';
+    agendaView = _prefs.getString('agendaView') ?? 'semaine';
     final raw = _prefs.getString('doc');
     if (raw != null) {
       try {
@@ -40,6 +42,12 @@ class Store extends ChangeNotifier {
     Timer.periodic(const Duration(seconds: 30), (_) => notifyListeners());
     Timer.periodic(const Duration(seconds: 90), (_) => sync());
     sync();
+  }
+
+  void setAgendaView(String v) {
+    agendaView = v;
+    _prefs.setString('agendaView', v);
+    notifyListeners();
   }
 
   bool get linked => repo.isNotEmpty && token.isNotEmpty;
@@ -56,12 +64,12 @@ class Store extends ChangeNotifier {
 
   // ---- Lecture ----
 
-  /// Ordre du backlog : catégorie (Mission d'abord), puis priorité, puis ancienneté.
+  /// Ordre : priorité (P0 d'abord), puis catégorie (Mission d'abord), puis ancienneté.
   static int _order(Task a, Task b) {
-    final c = a.catRank.compareTo(b.catRank);
-    if (c != 0) return c;
     final p = a.priority.compareTo(b.priority);
-    return p != 0 ? p : a.rank.compareTo(b.rank);
+    if (p != 0) return p;
+    final c = a.catRank.compareTo(b.catRank);
+    return c != 0 ? c : a.rank.compareTo(b.rank);
   }
 
   /// Tout le backlog ouvert, Parking compris.
@@ -82,6 +90,46 @@ class Store extends ChangeNotifier {
       backlog.where((t) => !t.parked && !t.pickedToday && !t.call).toList();
 
   bool get canPick => picks.length < 3;
+
+  // ---- Sprints d'une semaine (lundi → dimanche) ----
+
+  String get thisMonday => ymd(Schedule.mondayOf(DateTime.now()));
+
+  /// Le sprint d'une tâche ; un sprint passé ne compte plus, la tâche retourne au backlog.
+  String? sprintOf(Task t) =>
+      (t.sprint != null && t.sprint!.compareTo(thisMonday) >= 0) ? t.sprint : null;
+
+  /// Sprints en cours et à venir.
+  List<String> get sprints =>
+      schedule.sprints.where((s) => s.compareTo(thisMonday) >= 0).toSet().toList()..sort();
+
+  List<Task> sprintTasks(String s) =>
+      backlog.where((t) => !t.parked && sprintOf(t) == s).toList();
+
+  /// Crée le prochain sprint qui n'existe pas encore (cette semaine d'abord).
+  void createSprint() {
+    var m = Schedule.mondayOf(DateTime.now());
+    while (schedule.sprints.contains(ymd(m))) {
+      m = DateTime(m.year, m.month, m.day + 7);
+    }
+    schedule.sprints.add(ymd(m));
+    _saveSchedule();
+  }
+
+  void setSprint(Task t, String? s) {
+    t.sprint = s;
+    touch(t);
+  }
+
+  /// Ce que Maintenant déroule : appels et entretiens, tâches choisies pour aujourd'hui,
+  /// puis le reste du sprint en cours par priorité.
+  List<Task> get queue {
+    final out = <Task>[...calls, ...todayTodo.where((t) => !t.call)];
+    for (final t in sprintTasks(thisMonday)) {
+      if (!out.contains(t)) out.add(t);
+    }
+    return out;
+  }
 
   List<Task> get doneToday {
     final now = DateTime.now();
@@ -149,6 +197,7 @@ class Store extends ChangeNotifier {
 
   void park(Task t) {
     t.domain = 'Parking';
+    t.sprint = null;
     t.pickedOn = null;
     t.call = false;
     touch(t);

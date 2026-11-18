@@ -26,7 +26,7 @@ class Task {
   String title;
   String note;
   String domain; // catégorie
-  int priority; // 1 haute, 2 normale, 3 basse (à l'intérieur de la catégorie)
+  int priority; // P0 (le plus urgent) à P4
   String source; // conversation ou agent qui a créé la tâche
   List<String> links; // liens, vidéos, images
   double rank;
@@ -36,6 +36,7 @@ class Task {
   int? doneAt;
   String? pickedOn; // jour (aaaa-mm-jj) où elle a été choisie parmi les 3 tâches du jour
   bool call; // appel ou entretien de mission : passe devant tout
+  String? sprint; // lundi (aaaa-mm-jj) du sprint d'une semaine où elle est rangée
   bool deleted;
 
   Task({
@@ -53,6 +54,7 @@ class Task {
     this.doneAt,
     this.pickedOn,
     this.call = false,
+    this.sprint,
     this.deleted = false,
   })  : id = id ?? newId(),
         links = links ?? [],
@@ -64,7 +66,7 @@ class Task {
         title: (j['title'] ?? '') as String,
         note: (j['note'] ?? '') as String,
         domain: (j['domain'] ?? 'Personnel') as String,
-        priority: ((j['priority'] ?? 2) as num).toInt().clamp(1, 3),
+        priority: ((j['priority'] ?? 2) as num).toInt().clamp(0, 4),
         source: (j['source'] ?? '') as String,
         links: ((j['links'] ?? []) as List).map((e) => '$e').toList(),
         rank: ((j['rank'] ?? 0) as num).toDouble(),
@@ -74,6 +76,7 @@ class Task {
         doneAt: (j['doneAt'] as num?)?.toInt(),
         pickedOn: j['pickedOn'] as String?,
         call: (j['call'] ?? false) as bool,
+        sprint: j['sprint'] as String?,
         deleted: (j['deleted'] ?? false) as bool,
       );
 
@@ -92,6 +95,7 @@ class Task {
         'doneAt': doneAt,
         'pickedOn': pickedOn,
         'call': call,
+        'sprint': sprint,
         'deleted': deleted,
       };
 
@@ -179,6 +183,7 @@ class Schedule {
   Map<String, int> checks;
 
   String? reviewedOn; // dimanche de la dernière revue faite
+  List<String> sprints; // sprints créés : le lundi de chaque semaine
   int since; // les blocs commencés avant cet instant ne sont pas comptés
 
   Schedule({
@@ -192,7 +197,9 @@ class Schedule {
     Map<String, int>? checks,
     this.reviewedOn,
     this.since = 0,
+    List<String>? sprints,
   })  : blocks = blocks ?? [],
+        sprints = sprints ?? [],
         events = events ?? [],
         moves = moves ?? [],
         checks = checks ?? {};
@@ -214,6 +221,7 @@ class Schedule {
             .map((k, v) => MapEntry('$k', (v as num).toInt())),
         reviewedOn: j['reviewedOn'] as String?,
         since: ((j['since'] ?? 0) as num).toInt(),
+        sprints: ((j['sprints'] ?? []) as List).map((e) => '$e').toList(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -230,6 +238,7 @@ class Schedule {
             checks.entries.toList()..sort((a, b) => a.key.compareTo(b.key))),
         'reviewedOn': reviewedOn,
         'since': since,
+        'sprints': sprints.toList()..sort(),
       };
 
   static DateTime mondayOf(DateTime d) =>
