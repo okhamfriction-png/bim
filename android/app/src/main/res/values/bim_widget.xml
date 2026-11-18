@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="bim_widget_description">Tâches du sprint et agenda du jour</string>
+    <color name="bim_widget_bg">#FFFAF6EE</color>
+    <color name="bim_widget_ink">#FF1C1917</color>
+    <color name="bim_widget_sub">#FF78716C</color>
+    <color name="bim_widget_line">#FFE9E1D4</color>
+</resources>

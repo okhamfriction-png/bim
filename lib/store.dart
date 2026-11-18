@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -41,6 +42,7 @@ class Store extends ChangeNotifier {
     _purge();
     Timer.periodic(const Duration(seconds: 30), (_) => notifyListeners());
     Timer.periodic(const Duration(seconds: 90), (_) => sync());
+    _feedWidget();
     sync();
   }
 
@@ -154,9 +156,46 @@ class Store extends ChangeNotifier {
 
   // ---- Tâches ----
 
+  /// Résumé lu par le widget d'écran d'accueil Android : les tâches du sprint et
+  /// l'agenda des 14 prochains jours (le widget choisit la ligne du jour).
+  Future<void> _feedWidget() async {
+    if (kIsWeb) return;
+    String h(int m) => m % 60 == 0 ? '${m ~/ 60} h' : '${m ~/ 60} h ${(m % 60).toString().padLeft(2, '0')}';
+    final q = queue;
+    final now = DateTime.now();
+    final days = <String, dynamic>{};
+    for (var i = 0; i < 14; i++) {
+      final d = DateTime(now.year, now.month, now.day + i);
+      final w = schedule.weekOf(d);
+      // (début, fin, libellé) : le widget masque ce qui est déjà terminé.
+      final lines = <(int, int, String)>[
+        for (final o in schedule.occs(d)) (o.start, o.end, o.block.label),
+        for (final e in schedule.eventsOn(d))
+          ((e['start'] as num).toInt(), 24 * 60, '${e['label']}'),
+        for (final b in schedule.hints(d)) (b.start, b.start, b.label),
+      ]..sort((a, b) => a.$1.compareTo(b.$1));
+      days[ymd(d)] = {
+        'week': schedule.nameOf(w),
+        'kids': schedule.nameOf(w).toLowerCase().contains('avec'),
+        'lines': [for (final l in lines) {'h': h(l.$1), 'end': l.$2, 'l': l.$3}],
+      };
+    }
+    await _prefs.setString(
+        'widget',
+        jsonEncode({
+          'count': q.length,
+          'tasks': [for (final t in q.take(4)) {'p': t.priority, 't': t.title}],
+          'days': days,
+        }));
+    try {
+      await const MethodChannel('bim/widget').invokeMethod('refresh');
+    } catch (_) {}
+  }
+
   void _changed() {
     notifyListeners();
     _prefs.setString('doc', Doc(tasks, schedule).encode());
+    _feedWidget();
     _debounce?.cancel();
     _debounce = Timer(const Duration(seconds: 2), sync);
   }
@@ -316,6 +355,7 @@ class Store extends ChangeNotifier {
         }
         if (i == 2) throw 'Conflit de synchro, réessaie';
       }
+      _feedWidget();
       syncState = 'ok';
       syncError = '';
       lastSync = nowMs();

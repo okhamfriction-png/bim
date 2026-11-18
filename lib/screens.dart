@@ -328,13 +328,14 @@ class BacklogScreen extends StatefulWidget {
 class _BacklogScreenState extends State<BacklogScreen> {
   String group = 'cat'; // cat | source
   String addCat = 'Mission';
+  int addPrio = 2;
   final quick = TextEditingController();
   final focus = FocusNode();
 
   void add() {
     final s = quick.text.trim();
     if (s.isEmpty) return;
-    store.add(Task(title: s, domain: addCat));
+    store.add(Task(title: s, domain: addCat, priority: addPrio));
     quick.clear();
     focus.requestFocus();
   }
@@ -364,10 +365,31 @@ class _BacklogScreenState extends State<BacklogScreen> {
                 focusNode: focus,
                 textCapitalization: TextCapitalization.sentences,
                 decoration: InputDecoration(
-                    hintText: 'Ajouter une tâche, puis Entrée',
+                    hintText: 'Ajouter une tâche',
                     border: InputBorder.none,
                     hintStyle: TextStyle(color: p.sub)),
                 onSubmitted: (_) => add(),
+              ),
+            ),
+            PopupMenuButton<int>(
+              tooltip: 'Priorité : ${prioNames[addPrio]}',
+              initialValue: addPrio,
+              onSelected: (v) => setState(() => addPrio = v),
+              itemBuilder: (_) => [
+                for (var i = 0; i <= 4; i++)
+                  PopupMenuItem(
+                      value: i,
+                      child: Text(prioNames[i],
+                          style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              color: Color.lerp(prioColors[i], p.ink, .25)))),
+              ],
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                child: Text(prioNames[addPrio],
+                    style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        color: Color.lerp(prioColors[addPrio], p.ink, .25))),
               ),
             ),
             PopupMenuButton<String>(
