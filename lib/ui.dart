@@ -557,6 +557,14 @@ class _SyncSheetState extends State<SyncSheet> {
         _label(context, 'WIDGET ANDROID'),
         Stepper2('Opacité du fond (%)', store.widgetOpacity, store.setWidgetOpacity,
             step: 10, max: 100),
+        const SizedBox(height: 6),
+        Text('Priorités affichées', style: TextStyle(fontSize: 15, color: p.ink)),
+        const SizedBox(height: 8),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          for (var i = 0; i <= 4; i++)
+            Pick(prioNames[i], store.widgetPrios.contains(i), () => store.toggleWidgetPrio(i),
+                color: prioColors[i]),
+        ]),
         _label(context, 'POINTS DE VALEUR PAR UNITÉ LIVRÉE'),
         for (final k in kinds.entries)
           Stepper2('${k.value.$1} (par ${k.value.$2.substring(0, k.value.$2.length - 1)})',

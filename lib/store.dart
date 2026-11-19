@@ -19,6 +19,7 @@ class Store extends ChangeNotifier {
   String token = '';
   String themeMode = 'system'; // apparence : system | light | dark
   int widgetOpacity = 100; // opacité du fond du widget Android, en %
+  Set<int> widgetPrios = {0, 1, 2, 3, 4}; // priorités montrées dans le widget
   String agendaView = 'semaine'; // vue de l'agenda à l'ouverture : jour | semaine | mois | annee
   String syncState = 'off'; // off | sync | ok | error
   String syncError = '';
@@ -35,6 +36,9 @@ class Store extends ChangeNotifier {
     agendaView = _prefs.getString('agendaView') ?? 'semaine';
     themeMode = _prefs.getString('themeMode') ?? 'system';
     widgetOpacity = _prefs.getInt('widgetOpacity') ?? 100;
+    widgetPrios = (_prefs.getStringList('widgetPrios') ?? ['0', '1', '2', '3', '4'])
+        .map(int.parse)
+        .toSet();
     final raw = _prefs.getString('doc');
     if (raw != null) {
       try {
@@ -65,6 +69,19 @@ class Store extends ChangeNotifier {
   void setWidgetOpacity(int v) {
     widgetOpacity = v.clamp(0, 100);
     _prefs.setInt('widgetOpacity', widgetOpacity);
+    notifyListeners();
+    _feedWidget();
+  }
+
+  /// Montre ou cache une priorité dans le widget (il en reste toujours au moins une).
+  void toggleWidgetPrio(int p) {
+    if (widgetPrios.contains(p)) {
+      if (widgetPrios.length == 1) return;
+      widgetPrios.remove(p);
+    } else {
+      widgetPrios.add(p);
+    }
+    _prefs.setStringList('widgetPrios', [for (final x in widgetPrios) '$x']);
     notifyListeners();
     _feedWidget();
   }
@@ -310,7 +327,7 @@ class Store extends ChangeNotifier {
   Future<void> _feedWidget() async {
     if (kIsWeb) return;
     String h(int m) => m % 60 == 0 ? '${m ~/ 60} h' : '${m ~/ 60} h ${(m % 60).toString().padLeft(2, '0')}';
-    final q = queue;
+    final q = queue.where((t) => widgetPrios.contains(t.priority)).toList();
     final now = DateTime.now();
     final days = <String, dynamic>{};
     for (var i = 0; i < 14; i++) {
