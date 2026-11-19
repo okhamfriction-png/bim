@@ -735,7 +735,7 @@ class _DragList extends StatelessWidget {
       itemBuilder: (context, i) {
         final (t, lane) = rows[i];
         if (t == null) {
-          final n = tasks.where((x) => x.priority == lane).length;
+          final inLane = tasks.where((x) => x.priority == lane);
           return Container(
             key: ValueKey('couloir$lane'),
             decoration: BoxDecoration(
@@ -749,7 +749,7 @@ class _DragList extends StatelessWidget {
                   child: Text(laneNames[lane],
                       style: TextStyle(
                           fontSize: 12.5, fontWeight: FontWeight.w800, color: p.sub))),
-              Text(n == 0 ? 'vide' : '$n',
+              Text(inLane.isEmpty ? 'vide' : store.lanePoints(inLane),
                   style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: p.sub)),
             ]),
           );
@@ -827,7 +827,7 @@ class _TileState extends State<_Tile> {
     final dim = struck || t.parked;
     final color = domainOf(t.cat);
     final meta = [
-      if (store.valueLabel(t).isNotEmpty) store.valueLabel(t),
+      if (store.unitsLabel(t).isNotEmpty) store.unitsLabel(t),
       if (t.call) 'appel ou entretien',
       if (t.pickedToday && !struck) 'aujourd\'hui',
       t.source.isNotEmpty ? 'via ${t.source}' : t.cat,
@@ -903,6 +903,19 @@ class _TileState extends State<_Tile> {
                   Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: SubProgress(t, width: 34)),
+                if (store.pointsLabel(t).isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(right: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                        color: _statusColors['tenu']!.withValues(alpha: .15),
+                        borderRadius: BorderRadius.circular(6)),
+                    child: Text(store.pointsLabel(t),
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: Color.lerp(_statusColors['tenu'], p.ink, .25))),
+                  ),
                 PrioChip(t.priority),
                 IconButton(
                   tooltip: struck ? 'Remettre à faire' : 'Terminé',

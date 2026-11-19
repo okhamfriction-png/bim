@@ -1,5 +1,5 @@
 <script>
-  import { PRIO, LANES, app, place, addTask } from './store.svelte.js';
+  import { PRIO, LANES, app, place, addTask, lanePoints } from './store.svelte.js';
   import Task from './Task.svelte';
 
   // `sprint` : lundi du sprint, ou null pour les tâches hors sprint.
@@ -57,7 +57,7 @@
     <header style="--c: var(--p{i})">
       <span class="chip" style="background: var(--p{i})">{p}</span>
       <span class="name">{LANES[i]}</span>
-      <span class="n">{lane(i).length || 'vide'}</span>
+      <span class="n">{lane(i).length ? lanePoints(lane(i)) : 'vide'}</span>
     </header>
     {#each lane(i) as t (t.id)}
       <div

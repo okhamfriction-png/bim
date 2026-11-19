@@ -399,6 +399,27 @@ class Store extends ChangeNotifier {
   int plannedOf(Task t) => coefOf(t) * t.unitsTotal;
   int earnedOf(Task t) => coefOf(t) * t.unitsDone;
 
+  static String _pts(int n) => '$n pt${n > 1 ? 's' : ''}';
+
+  /// « 0/9 pts » ou « 2 pts », vide pour une tâche sans points.
+  String pointsLabel(Task t) {
+    if (t.kindOf.isEmpty) return '';
+    return t.subs.isEmpty ? _pts(coefOf(t)) : '${earnedOf(t)}/${_pts(plannedOf(t))}';
+  }
+
+  /// « 0/3 blocs », vide pour une tâche sans sous-tâche à points.
+  String unitsLabel(Task t) {
+    final k = kinds[t.kindOf];
+    return k == null || t.subs.isEmpty ? '' : '${t.unitsDone}/${t.unitsTotal} ${k.$2}';
+  }
+
+  /// Points d'un groupe de tâches : « 3/13 pts » dès qu'il y en a de gagnés, sinon « 13 pts ».
+  String lanePoints(Iterable<Task> ts) {
+    final planned = ts.fold(0, (a, t) => a + plannedOf(t));
+    final earned = ts.fold(0, (a, t) => a + earnedOf(t));
+    return earned > 0 ? '$earned/${_pts(planned)}' : _pts(planned);
+  }
+
   /// « Rue 3/10 blocs · 9/30 pts », vide pour une tâche sans points.
   String valueLabel(Task t) {
     final k = kinds[t.kindOf];

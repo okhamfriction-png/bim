@@ -1,6 +1,6 @@
 <script>
   import {
-    PRIO, CATS, KINDS, iconOf, valueLabel, sprints, dateOf, catOf,
+    PRIO, CATS, KINDS, iconOf, pointsLabel, unitsLabel, sprints, dateOf, catOf,
     complete, reopen, toggleSub, addSub, removeSub, remove, touch,
   } from './store.svelte.js';
 
@@ -8,7 +8,8 @@
   let open = $state(false);
   let sub = $state('');
   const done = $derived(t.status === 'done');
-  const label = $derived(valueLabel(t));
+  const label = $derived(unitsLabel(t));
+  const points = $derived(pointsLabel(t));
   const sprintName = (s) => `Sprint du ${dateOf(s).getDate()}/${dateOf(s).getMonth() + 1}`;
 
   function submitSub(e) {
@@ -39,6 +40,7 @@
         {/if}
       </span>
     </button>
+    {#if points}<span class="pts">{points}</span>{/if}
     <span class="chip" style="background: var(--p{t.priority})">{PRIO[t.priority]}</span>
     <button
       class="check"
@@ -121,6 +123,10 @@
   .title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .done .title { text-decoration: line-through; }
   .meta { font-size: 12.5px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pts {
+    flex: none; font-size: 12.5px; font-weight: 800; padding: 2px 8px; border-radius: 6px;
+    color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, var(--card));
+  }
   .check {
     width: 24px; height: 24px; flex: none; border-radius: 50%; border: 2px solid var(--sub);
     display: grid; place-items: center; font-weight: 900; font-size: 13px;

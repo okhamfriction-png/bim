@@ -96,6 +96,23 @@ export const coefOf = (t) => {
 export const plannedOf = (t) => coefOf(t) * unitsTotal(t);
 export const earnedOf = (t) => coefOf(t) * unitsDone(t);
 
+const pts = (n) => `${n} pt${n > 1 ? 's' : ''}`;
+/** « 0/9 pts » ou « 2 pts », vide pour une tâche sans points. */
+export function pointsLabel(t) {
+  if (!kindOf(t)) return '';
+  return subs(t).length ? `${earnedOf(t)}/${pts(plannedOf(t))}` : pts(coefOf(t));
+}
+/** « 0/3 blocs », vide pour une tâche sans sous-tâche à points. */
+export function unitsLabel(t) {
+  const k = KINDS[kindOf(t)];
+  return k && subs(t).length ? `${unitsDone(t)}/${unitsTotal(t)} ${k.unit}` : '';
+}
+/** Points d'un groupe de tâches : « 3/13 pts » dès qu'il y en a de gagnés, sinon « 13 pts ». */
+export function lanePoints(tasks) {
+  const planned = tasks.reduce((a, t) => a + plannedOf(t), 0);
+  const earned = tasks.reduce((a, t) => a + earnedOf(t), 0);
+  return earned ? `${earned}/${pts(planned)}` : pts(planned);
+}
 /** « 0/3 blocs · 0/9 pts », vide pour une tâche sans points. */
 export function valueLabel(t) {
   const k = KINDS[kindOf(t)];
