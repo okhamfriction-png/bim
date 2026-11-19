@@ -235,7 +235,7 @@ class _NowScreenState extends State<NowScreen> {
             margin: const EdgeInsets.fromLTRB(16, 6, 16, 6),
             header: PanelHead('À faire dans le sprint',
                 icon: Icons.flag_rounded, color: p.accent, count: '${queue.length}'),
-            children: [for (final x in queue) _Tile(x, key: ValueKey(x.id))],
+            children: [_DragList(queue)],
           ),
       ]),
     );

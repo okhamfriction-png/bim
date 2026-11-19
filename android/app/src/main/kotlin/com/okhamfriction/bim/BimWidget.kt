@@ -32,6 +32,9 @@ class BimWidget : AppWidgetProvider() {
         private val taskIds = intArrayOf(
             R.id.t1, R.id.t2, R.id.t3, R.id.t4, R.id.t5, R.id.t6, R.id.t7, R.id.t8, R.id.t9
         )
+        private val prioColors = intArrayOf(
+            0xFFEF4444.toInt(), 0xFFF97316.toInt(), 0xFF3B82F6.toInt(), 0xFF64748B.toInt(), 0xFF94A3B8.toInt()
+        )
         private val agendaIds = intArrayOf(R.id.a1, R.id.a2, R.id.a3)
         /** Fond et icône d'une tâche d'après sa catégorie. */
         private fun look(cat: String, call: Boolean): Pair<Int, String> = when {
@@ -73,14 +76,17 @@ class BimWidget : AppWidgetProvider() {
                     views.setViewVisibility(taskIds[i], View.GONE)
                     continue
                 }
-                val (bg, icon) = look(t.optString("c", "Personnel"), t.optBoolean("call", false))
-                views.setTextViewText(taskIds[i], "$icon  ${t.optString("t")}")
-                views.setInt(taskIds[i], "setBackgroundResource", bg)
+                val (_, icon) = look(t.optString("c", "Personnel"), t.optBoolean("call", false))
+                // Icône, priorité en couleur, titre : pas de fond.
+                val prio = t.optInt("p", 2).coerceIn(0, 4)
+                val line = SpannableString("$icon  P$prio  ${t.optString("t")}")
+                val at = icon.length + 2
+                line.setSpan(ForegroundColorSpan(prioColors[prio]), at, at + 2, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                views.setTextViewText(taskIds[i], line)
                 views.setViewVisibility(taskIds[i], View.VISIBLE)
             }
             if (data == null || (tasks?.length() ?: 0) == 0) {
                 views.setTextViewText(taskIds[0], if (data == null) "Ouvre Bim pour remplir le widget" else "✅  Sprint : rien à faire")
-                views.setInt(taskIds[0], "setBackgroundResource", R.drawable.bim_w_parking)
                 views.setViewVisibility(taskIds[0], View.VISIBLE)
             }
 
