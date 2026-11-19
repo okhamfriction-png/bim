@@ -18,6 +18,7 @@ class Store extends ChangeNotifier {
   String repo = '';
   String token = '';
   String themeMode = 'system'; // apparence : system | light | dark
+  int widgetOpacity = 100; // opacité du fond du widget Android, en %
   String agendaView = 'semaine'; // vue de l'agenda à l'ouverture : jour | semaine | mois | annee
   String syncState = 'off'; // off | sync | ok | error
   String syncError = '';
@@ -33,6 +34,7 @@ class Store extends ChangeNotifier {
     token = _prefs.getString('token') ?? '';
     agendaView = _prefs.getString('agendaView') ?? 'semaine';
     themeMode = _prefs.getString('themeMode') ?? 'system';
+    widgetOpacity = _prefs.getInt('widgetOpacity') ?? 100;
     final raw = _prefs.getString('doc');
     if (raw != null) {
       try {
@@ -58,6 +60,13 @@ class Store extends ChangeNotifier {
     themeMode = v;
     _prefs.setString('themeMode', v);
     notifyListeners();
+  }
+
+  void setWidgetOpacity(int v) {
+    widgetOpacity = v.clamp(0, 100);
+    _prefs.setInt('widgetOpacity', widgetOpacity);
+    notifyListeners();
+    _feedWidget();
   }
 
   bool get linked => repo.isNotEmpty && token.isNotEmpty;
@@ -310,6 +319,7 @@ class Store extends ChangeNotifier {
         'widget',
         jsonEncode({
           'count': q.length,
+          'alpha': widgetOpacity,
           'tasks': [for (final t in q.take(9)) {'p': t.priority, 't': t.title, 'c': t.cat, 'call': t.call}],
           'days': days,
         }));

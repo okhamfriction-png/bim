@@ -1,10 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Tâches du sprint à gauche (4/6) en pastilles de couleur, agenda du jour à droite (2/6). -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/root"
     android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Le fond, à part, pour régler son opacité sans toucher au texte. -->
+    <ImageView
+        android:id="@+id/bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:scaleType="fitXY"
+        android:src="@drawable/bim_widget_bg" />
+
+<LinearLayout
+    android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/bim_widget_bg"
     android:orientation="horizontal"
     android:paddingStart="12dp"
     android:paddingTop="8dp"
@@ -213,3 +225,4 @@
             android:textSize="17sp" />
     </LinearLayout>
 </LinearLayout>
+</FrameLayout>

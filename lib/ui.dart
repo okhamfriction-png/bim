@@ -543,6 +543,9 @@ class _SyncSheetState extends State<SyncSheet> {
           ])
             Pick(v.$2, store.agendaView == v.$1, () => store.setAgendaView(v.$1)),
         ]),
+        _label(context, 'WIDGET ANDROID'),
+        Stepper2('Opacité du fond (%)', store.widgetOpacity, store.setWidgetOpacity,
+            step: 10, max: 100),
         _label(context, 'POINTS DE VALEUR PAR UNITÉ LIVRÉE'),
         for (final k in kinds.entries)
           Stepper2('${k.value.$1} (par ${k.value.$2.substring(0, k.value.$2.length - 1)})',
@@ -615,8 +618,9 @@ class _SyncSheetState extends State<SyncSheet> {
 class Stepper2 extends StatelessWidget {
   final String label;
   final int value, step;
+  final int? max;
   final ValueChanged<int> onChanged;
-  const Stepper2(this.label, this.value, this.onChanged, {this.step = 1, super.key});
+  const Stepper2(this.label, this.value, this.onChanged, {this.step = 1, this.max, super.key});
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
@@ -635,7 +639,7 @@ class Stepper2 extends StatelessWidget {
       IconButton(
           tooltip: 'Plus',
           visualDensity: VisualDensity.compact,
-          onPressed: () => onChanged(value + step),
+          onPressed: max != null && value >= max! ? null : () => onChanged(value + step),
           icon: const Icon(Icons.add_circle_outline)),
     ]);
   }

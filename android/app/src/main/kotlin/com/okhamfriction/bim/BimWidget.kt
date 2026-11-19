@@ -61,6 +61,10 @@ class BimWidget : AppWidgetProvider() {
                 .getString("flutter.widget", null)
             val data = try { if (raw == null) null else JSONObject(raw) } catch (e: Exception) { null }
 
+            // Opacité du fond, réglée dans l'appli (100 = opaque).
+            val alpha = (data?.optInt("alpha", 100) ?: 100).coerceIn(0, 100)
+            views.setInt(R.id.bg, "setImageAlpha", alpha * 255 / 100)
+
             // Gauche : les tâches du sprint, par priorité.
             val tasks = data?.optJSONArray("tasks")
             for (i in taskIds.indices) {
