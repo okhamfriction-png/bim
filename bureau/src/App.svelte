@@ -43,6 +43,7 @@
     <button class="sync {app.sync}" onclick={sync} title={app.sync === 'error' ? app.error : 'Synchroniser'}>
       <i></i>{app.sync === 'ok' ? 'Synchronisé' : app.sync === 'sync' ? 'Synchro…' : app.sync === 'error' ? 'Erreur de synchro' : 'Non relié'}
     </button>
+    <a class="btn" href="../?mobile=1" title="L'appli complète, au format téléphone">Version mobile</a>
     <button class="btn" onclick={() => (settings = true)}>Réglages</button>
   </header>
 
@@ -112,6 +113,7 @@
   .bar { height: 6px; border-radius: 99px; background: var(--line); overflow: hidden; }
   .bar i { display: block; height: 100%; background: var(--ok); border-radius: 99px; transition: width .3s; }
   .grow { flex: 1; }
+  a.btn { text-decoration: none; color: inherit; }
   .sync { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; color: var(--sub); }
   .sync i { width: 9px; height: 9px; border-radius: 50%; background: var(--p4); }
   .sync.ok i { background: var(--ok); }

@@ -29,6 +29,14 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
+  <!-- Sur un grand écran, la version bureau (Svelte) ; « ?mobile » garde celle-ci. -->
+  <script>
+    if (location.pathname.indexOf('/bim/') === 0 && innerWidth >= 900 &&
+        location.search.indexOf('mobile') < 0) {
+      location.replace('bureau/');
+    }
+  </script>
+
   <title>Bim</title>
   <link rel="manifest" href="manifest.json">
 </head>
