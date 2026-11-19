@@ -74,12 +74,36 @@ class Store extends ChangeNotifier {
 
   // ---- Lecture ----
 
-  /// Ordre : priorité (P0 d'abord), puis catégorie (Mission d'abord), puis ancienneté.
+  /// Ordre : priorité (P0 d'abord), puis le rang (ordre d'ajout, ou celui choisi en glissant).
   static int _order(Task a, Task b) {
     final p = a.priority.compareTo(b.priority);
-    if (p != 0) return p;
-    final c = a.catRank.compareTo(b.catRank);
-    return c != 0 ? c : a.rank.compareTo(b.rank);
+    return p != 0 ? p : a.rank.compareTo(b.rank);
+  }
+
+  /// Déplace une tâche dans une liste affichée. Glissée parmi des tâches d'une autre
+  /// priorité, elle prend cette priorité : la liste reste rangée par priorité.
+  void moveTask(List<Task> list, int from, int to) {
+    if (from == to) return;
+    final l = [...list];
+    final t = l.removeAt(from);
+    l.insert(to, t);
+    final prev = to > 0 ? l[to - 1] : null;
+    final next = to < l.length - 1 ? l[to + 1] : null;
+    if (prev != null && t.priority < prev.priority) {
+      t.priority = prev.priority;
+    } else if (next != null && t.priority > next.priority) {
+      t.priority = next.priority;
+    }
+    final lo = prev != null && prev.priority == t.priority ? prev.rank : null;
+    final hi = next != null && next.priority == t.priority ? next.rank : null;
+    if (lo != null && hi != null) {
+      t.rank = (lo + hi) / 2;
+    } else if (lo != null) {
+      t.rank = lo + 1;
+    } else if (hi != null) {
+      t.rank = hi - 1;
+    }
+    touch(t);
   }
 
   /// Tout le backlog ouvert, Parking compris.

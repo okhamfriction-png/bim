@@ -528,7 +528,7 @@ class _BacklogScreenState extends State<BacklogScreen> {
               ),
             ]),
           ),
-        for (final t in open) _Tile(t, key: ValueKey(t.id)),
+        if (open.isNotEmpty) _DragList(open),
       ],
     );
   }
@@ -677,7 +677,7 @@ class _BacklogScreenState extends State<BacklogScreen> {
                   : (g.key == mine ? Icons.person_rounded : Icons.forum_rounded),
               color: group == 'cat' ? domainOf(g.key) : null,
               count: '${g.value.length}'),
-          children: [for (final t in g.value) _Tile(t, key: ValueKey(t.id))],
+          children: [_DragList(g.value)],
         ),
       if (done.isNotEmpty || nArch > 0)
         SectionTitle('TERMINÉ',
@@ -713,6 +713,40 @@ class _BacklogScreenState extends State<BacklogScreen> {
 
 /// Ranger une tâche dans un sprint, ou la remettre au backlog.
 /// Pour une tâche archivée : la changer de sprint, sprints passés compris.
+/// Une liste de tâches qu'on réordonne en restant appuyé sur une ligne puis en la glissant.
+class _DragList extends StatelessWidget {
+  final List<Task> tasks;
+  const _DragList(this.tasks);
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    return ReorderableListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      buildDefaultDragHandles: false,
+      itemCount: tasks.length,
+      onReorderStart: (_) => HapticFeedback.mediumImpact(),
+      onReorder: (from, to) => store.moveTask(tasks, from, to > from ? to - 1 : to),
+      proxyDecorator: (child, _, _) => Material(
+          color: p.card,
+          elevation: 8,
+          shadowColor: Colors.black54,
+          borderRadius: BorderRadius.circular(12),
+          clipBehavior: Clip.antiAlias,
+          child: child),
+      itemBuilder: (context, i) => ReorderableDelayedDragStartListener(
+        key: ValueKey(tasks[i].id),
+        index: i,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+              border: i == 0 ? null : Border(top: BorderSide(color: p.line))),
+          child: _Tile(tasks[i]),
+        ),
+      ),
+    );
+  }
+}
+
 class SprintSheet extends StatelessWidget {
   final Task task;
   const SprintSheet(this.task, {super.key});
