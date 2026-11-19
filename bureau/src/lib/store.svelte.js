@@ -32,8 +32,9 @@ const emptyDoc = () => ({ version: 2, tasks: [], schedule: {} });
 
 export const app = $state({
   doc: read('bim.doc', emptyDoc()),
-  repo: read('bim.repo', ''),
-  token: read('bim.token', ''),
+  // À défaut, le dépôt et le jeton déjà saisis dans l'appli web (même adresse, même navigateur).
+  repo: read('bim.repo', '') || read('flutter.repo', ''),
+  token: read('bim.token', '') || read('flutter.token', ''),
   sync: 'off', // off | sync | ok | error
   error: '',
   now: Date.now(),
