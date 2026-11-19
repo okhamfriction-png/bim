@@ -65,13 +65,21 @@ class BimWidget : AppWidgetProvider() {
             val data = try { if (raw == null) null else JSONObject(raw) } catch (e: Exception) { null }
 
             // Opacité du fond, réglée dans l'appli (100 = opaque).
-            val alpha = (data?.optInt("alpha", 100) ?: 100).coerceIn(0, 100)
+            val alpha = WidgetPrefs.alpha(context)
             views.setInt(R.id.bg, "setImageAlpha", alpha * 255 / 100)
 
             // Gauche : les tâches du sprint, par priorité.
-            val tasks = data?.optJSONArray("tasks")
+            val prios = WidgetPrefs.prios(context)
+            val every = data?.optJSONArray("tasks")
+            val tasks = ArrayList<JSONObject>()
+            if (every != null) {
+                for (i in 0 until every.length()) {
+                    val t = every.optJSONObject(i) ?: continue
+                    if (t.optInt("p", 2) in prios) tasks.add(t)
+                }
+            }
             for (i in taskIds.indices) {
-                val t = tasks?.optJSONObject(i)
+                val t = tasks.getOrNull(i)
                 if (t == null) {
                     views.setViewVisibility(taskIds[i], View.GONE)
                     continue
@@ -94,7 +102,7 @@ class BimWidget : AppWidgetProvider() {
                 views.setTextViewText(taskIds[i], line)
                 views.setViewVisibility(taskIds[i], View.VISIBLE)
             }
-            if (data == null || (tasks?.length() ?: 0) == 0) {
+            if (data == null || tasks.isEmpty()) {
                 views.setTextViewText(taskIds[0], if (data == null) "Ouvre Bim pour remplir le widget" else "✅  Sprint : rien à faire")
                 views.setViewVisibility(taskIds[0], View.VISIBLE)
             }

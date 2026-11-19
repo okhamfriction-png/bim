@@ -48,6 +48,7 @@ class Store extends ChangeNotifier {
       } catch (_) {}
     }
     _purge();
+    await loadWidgetConfig();
     Timer.periodic(const Duration(seconds: 30), (_) => notifyListeners());
     Timer.periodic(const Duration(seconds: 90), (_) => sync());
     _feedWidget();
@@ -66,11 +67,36 @@ class Store extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Les réglages du widget vivent côté Android (on peut aussi les changer par un
+  /// appui long sur le widget) : on les relit au démarrage et au retour dans l'appli.
+  Future<void> loadWidgetConfig() async {
+    if (kIsWeb) return;
+    try {
+      final c = await _widgetChannel.invokeMethod<Map>('config');
+      if (c == null) {
+        await _pushWidgetConfig(); // première fois : on y porte les réglages de l'appli
+      } else {
+        widgetOpacity = (c['alpha'] as num).toInt();
+        widgetPrios = {for (final p in c['prios'] as List) (p as num).toInt()};
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  static const _widgetChannel = MethodChannel('bim/widget');
+
+  Future<void> _pushWidgetConfig() async {
+    try {
+      await _widgetChannel
+          .invokeMethod('setConfig', {'alpha': widgetOpacity, 'prios': widgetPrios.toList()..sort()});
+    } catch (_) {}
+  }
+
   void setWidgetOpacity(int v) {
     widgetOpacity = v.clamp(0, 100);
     _prefs.setInt('widgetOpacity', widgetOpacity);
     notifyListeners();
-    _feedWidget();
+    _pushWidgetConfig();
   }
 
   /// Montre ou cache une priorité dans le widget (il en reste toujours au moins une).
@@ -83,7 +109,7 @@ class Store extends ChangeNotifier {
     }
     _prefs.setStringList('widgetPrios', [for (final x in widgetPrios) '$x']);
     notifyListeners();
-    _feedWidget();
+    _pushWidgetConfig();
   }
 
   bool get linked => repo.isNotEmpty && token.isNotEmpty;
@@ -327,7 +353,7 @@ class Store extends ChangeNotifier {
   Future<void> _feedWidget() async {
     if (kIsWeb) return;
     String h(int m) => m % 60 == 0 ? '${m ~/ 60} h' : '${m ~/ 60} h ${(m % 60).toString().padLeft(2, '0')}';
-    final q = queue.where((t) => widgetPrios.contains(t.priority)).toList();
+    final q = queue; // le widget filtre lui-même les priorités choisies
     final now = DateTime.now();
     final days = <String, dynamic>{};
     for (var i = 0; i < 14; i++) {
@@ -350,8 +376,7 @@ class Store extends ChangeNotifier {
         'widget',
         jsonEncode({
           'count': q.length,
-          'alpha': widgetOpacity,
-          'tasks': [for (final t in q.take(9)) {'p': t.priority, 't': t.title, 'c': t.cat, 'k': t.kindOf, 'call': t.call}],
+          'tasks': [for (final t in q.take(40)) {'p': t.priority, 't': t.title, 'c': t.cat, 'k': t.kindOf, 'call': t.call}],
           'days': days,
         }));
     try {

@@ -107,7 +107,10 @@ class _ShellState extends State<Shell> {
   @override
   void initState() {
     super.initState();
-    _life = AppLifecycleListener(onResume: store.sync);
+    _life = AppLifecycleListener(onResume: () {
+      store.loadWidgetConfig();
+      store.sync();
+    });
   }
 
   @override
