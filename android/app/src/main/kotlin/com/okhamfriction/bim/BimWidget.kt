@@ -76,7 +76,16 @@ class BimWidget : AppWidgetProvider() {
                     views.setViewVisibility(taskIds[i], View.GONE)
                     continue
                 }
-                val (_, icon) = look(t.optString("c", "Personnel"), t.optBoolean("call", false))
+                val (_, catIcon) = look(t.optString("c", "Personnel"), t.optBoolean("call", false))
+                // Le type de tâche donne l'icône ; sinon celle de la catégorie.
+                val icon = if (t.optBoolean("call", false)) catIcon else when (t.optString("k", "")) {
+                    "rue" -> "🚶"
+                    "paris" -> "🎥"
+                    "montee" -> "🎬"
+                    "short" -> "📱"
+                    "rangement" -> "🗂️"
+                    else -> catIcon
+                }
                 // Icône, priorité en couleur, titre : pas de fond.
                 val prio = t.optInt("p", 2).coerceIn(0, 4)
                 val line = SpannableString("$icon  P$prio  ${t.optString("t")}")

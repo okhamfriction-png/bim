@@ -860,7 +860,7 @@ class _TileState extends State<_Tile> {
                   decoration: BoxDecoration(
                       color: color.withValues(alpha: .16),
                       borderRadius: BorderRadius.circular(10)),
-                  child: Icon(t.call ? Icons.phone_in_talk_rounded : iconOf(t.cat),
+                  child: Icon(t.call ? Icons.phone_in_talk_rounded : taskIcon(t),
                       color: color, size: 19),
                 ),
                 const SizedBox(width: 12),
@@ -1826,7 +1826,7 @@ class ReviewPage extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Row(children: [
-                        Icon(iconOf(t.cat), size: 18, color: domainOf(t.cat)),
+                        Icon(taskIcon(t), size: 18, color: domainOf(t.cat)),
                         const SizedBox(width: 10),
                         Expanded(
                             child: Text(t.title,
@@ -1842,7 +1842,7 @@ class ReviewPage extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Row(children: [
-                        Icon(iconOf(t.cat), size: 18, color: domainOf(t.cat)),
+                        Icon(taskIcon(t), size: 18, color: domainOf(t.cat)),
                         const SizedBox(width: 10),
                         Expanded(
                             child: Text('${t.title} : ${t.progress}',
@@ -1868,7 +1868,7 @@ class ReviewPage extends StatelessWidget {
                           border: Border.all(color: p.line)),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Row(children: [
-                          Icon(iconOf(t.cat), size: 18, color: domainOf(t.cat)),
+                          Icon(taskIcon(t), size: 18, color: domainOf(t.cat)),
                           const SizedBox(width: 10),
                           Expanded(
                               child: Text(t.title,

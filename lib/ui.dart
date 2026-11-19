@@ -52,6 +52,17 @@ const domainIcons = <String, IconData>{
 
 IconData iconOf(String d) => domainIcons[d] ?? Icons.label_rounded;
 
+/// Icône du type de tâche : elle dit ce que c'est, le titre n'a plus à le répéter.
+const kindIcons = <String, IconData>{
+  'rue': Icons.signpost_rounded,
+  'paris': Icons.videocam_rounded,
+  'montee': Icons.movie_edit,
+  'short': Icons.smartphone_rounded,
+  'rangement': Icons.inventory_2_rounded,
+};
+
+IconData taskIcon(Task t) => kindIcons[t.kindOf] ?? iconOf(t.cat);
+
 Color domainOf(String d) => domains[d] ?? const Color(0xFF94A3B8);
 
 const dayLetters = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];

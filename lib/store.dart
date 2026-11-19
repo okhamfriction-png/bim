@@ -334,7 +334,7 @@ class Store extends ChangeNotifier {
         jsonEncode({
           'count': q.length,
           'alpha': widgetOpacity,
-          'tasks': [for (final t in q.take(9)) {'p': t.priority, 't': t.title, 'c': t.cat, 'call': t.call}],
+          'tasks': [for (final t in q.take(9)) {'p': t.priority, 't': t.title, 'c': t.cat, 'k': t.kindOf, 'call': t.call}],
           'days': days,
         }));
     try {
@@ -389,8 +389,8 @@ class Store extends ChangeNotifier {
     final c = coefOf(t);
     String pts(int n) => '$n pt${n > 1 ? 's' : ''}';
     return t.subs.isEmpty
-        ? '${k.$1} · ${pts(c)}'
-        : '${k.$1} ${t.unitsDone}/${t.unitsTotal} ${k.$2} · ${earnedOf(t)}/${pts(plannedOf(t))}';
+        ? pts(c)
+        : '${t.unitsDone}/${t.unitsTotal} ${k.$2} · ${earnedOf(t)}/${pts(plannedOf(t))}';
   }
 
   /// Instants où les unités d'une tâche ont été livrées.
