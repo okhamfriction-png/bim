@@ -5,15 +5,28 @@
   // `sprint` : lundi du sprint, ou null pour les tâches hors sprint.
   let { tasks, sprint, adder = true } = $props();
   let over = $state(-1);
+  let mark = $state(null); // où la tâche glissée tomberait : { id, after }
   let title = $state('');
   let prio = $state(2);
 
   const lane = (i) => tasks.filter((t) => t.priority === i);
 
+  // Moitié haute d'une ligne : avant elle ; moitié basse : après.
+  function hover(e, t) {
+    e.preventDefault();
+    const r = e.currentTarget.getBoundingClientRect();
+    mark = { id: t.id, after: e.clientY > r.top + r.height / 2 };
+  }
+  function dropOn(e, i, t) {
+    const after = mark?.id === t.id && mark.after;
+    const l = lane(i);
+    drop(e, i, after ? l[l.indexOf(t) + 1] ?? null : t);
+  }
   function drop(e, i, before) {
     e.preventDefault();
     e.stopPropagation();
     over = -1;
+    mark = null;
     const t = app.doc.tasks.find((x) => x.id === e.dataTransfer.getData('text/bim-task'));
     if (t && t !== before) place(t, i, sprint, before, lane(i));
   }
@@ -38,7 +51,7 @@
     class:over={over === i}
     role="list"
     ondragover={(e) => { e.preventDefault(); over = i; }}
-    ondragleave={() => (over = -1)}
+    ondragleave={() => { over = -1; mark = null; }}
     ondrop={(e) => drop(e, i, null)}
   >
     <header style="--c: var(--p{i})">
@@ -47,7 +60,14 @@
       <span class="n">{lane(i).length || 'vide'}</span>
     </header>
     {#each lane(i) as t (t.id)}
-      <div role="presentation" ondrop={(e) => drop(e, i, t)}>
+      <div
+        role="presentation"
+        class="slot"
+        class:before={mark?.id === t.id && !mark.after}
+        class:after={mark?.id === t.id && mark.after}
+        ondragover={(e) => hover(e, t)}
+        ondrop={(e) => dropOn(e, i, t)}
+      >
         <Task {t} />
       </div>
     {/each}
@@ -63,6 +83,12 @@
     border-top: 1px solid var(--line);
     background: color-mix(in srgb, var(--c) 10%, var(--soft));
   }
+  .slot { position: relative; }
+  .slot.before::before, .slot.after::after {
+    content: ''; position: absolute; left: 0; right: 0; height: 3px; background: var(--accent); z-index: 2;
+  }
+  .slot.before::before { top: -1px; }
+  .slot.after::after { bottom: -2px; }
   .name { flex: 1; font-size: 12.5px; font-weight: 800; color: var(--sub); }
   .n { font-size: 12.5px; font-weight: 700; color: var(--sub); }
 </style>
