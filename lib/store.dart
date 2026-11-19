@@ -286,7 +286,7 @@ class Store extends ChangeNotifier {
         'widget',
         jsonEncode({
           'count': q.length,
-          'tasks': [for (final t in q.take(4)) {'p': t.priority, 't': t.title, 'c': t.cat, 'call': t.call}],
+          'tasks': [for (final t in q.take(9)) {'p': t.priority, 't': t.title, 'c': t.cat, 'call': t.call}],
           'days': days,
         }));
     try {

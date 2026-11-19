@@ -29,7 +29,9 @@ class BimWidget : AppWidgetProvider() {
     }
 
     companion object {
-        private val taskIds = intArrayOf(R.id.t1, R.id.t2, R.id.t3)
+        private val taskIds = intArrayOf(
+            R.id.t1, R.id.t2, R.id.t3, R.id.t4, R.id.t5, R.id.t6, R.id.t7, R.id.t8, R.id.t9
+        )
         private val agendaIds = intArrayOf(R.id.a1, R.id.a2, R.id.a3)
         /** Fond et icône d'une tâche d'après sa catégorie. */
         private fun look(cat: String, call: Boolean): Pair<Int, String> = when {
