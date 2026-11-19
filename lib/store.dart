@@ -404,7 +404,7 @@ class Store extends ChangeNotifier {
   /// « 0/9 pts » ou « 2 pts », vide pour une tâche sans points.
   String pointsLabel(Task t) {
     if (t.kindOf.isEmpty) return '';
-    return t.subs.isEmpty ? _pts(coefOf(t)) : '${earnedOf(t)}/${_pts(plannedOf(t))}';
+    return '${earnedOf(t)}/${_pts(plannedOf(t))}';
   }
 
   /// « 0/3 blocs », vide pour une tâche sans sous-tâche à points.

@@ -100,7 +100,7 @@ const pts = (n) => `${n} pt${n > 1 ? 's' : ''}`;
 /** « 0/9 pts » ou « 2 pts », vide pour une tâche sans points. */
 export function pointsLabel(t) {
   if (!kindOf(t)) return '';
-  return subs(t).length ? `${earnedOf(t)}/${pts(plannedOf(t))}` : pts(coefOf(t));
+  return `${earnedOf(t)}/${pts(plannedOf(t))}`;
 }
 /** « 0/3 blocs », vide pour une tâche sans sous-tâche à points. */
 export function unitsLabel(t) {
