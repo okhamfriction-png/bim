@@ -33,6 +33,11 @@ ThemeData _theme(Pal p, Brightness b) => ThemeData(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: p.ink, width: 1.5)),
       ),
+      // Le fond des feuilles suit le thème, même s'il change pendant qu'une feuille est ouverte.
+      bottomSheetTheme: BottomSheetThemeData(
+          backgroundColor: p.card,
+          modalBackgroundColor: p.card,
+          surfaceTintColor: Colors.transparent),
       snackBarTheme: SnackBarThemeData(
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),

@@ -343,7 +343,6 @@ class Pick extends StatelessWidget {
 Future<T?> sheet<T>(BuildContext context, Widget child) => showModalBottomSheet<T>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Pal.of(context).card,
       constraints: const BoxConstraints(maxWidth: 640),
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
