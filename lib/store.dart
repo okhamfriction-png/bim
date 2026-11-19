@@ -89,6 +89,20 @@ class Store extends ChangeNotifier {
     return p != 0 ? p : a.rank.compareTo(b.rank);
   }
 
+  /// Range une tâche dans un couloir de priorité, entre deux voisines du même couloir.
+  void placeTask(Task t, int priority, Task? prev, Task? next) {
+    t.priority = priority.clamp(0, 4);
+    final lo = prev?.rank, hi = next?.rank;
+    if (lo != null && hi != null) {
+      t.rank = (lo + hi) / 2;
+    } else if (lo != null) {
+      t.rank = lo + 1;
+    } else if (hi != null) {
+      t.rank = hi - 1;
+    }
+    touch(t);
+  }
+
   /// Déplace une tâche dans une liste affichée. Glissée parmi des tâches d'une autre
   /// priorité, elle prend cette priorité : la liste reste rangée par priorité.
   void moveTask(List<Task> list, int from, int to) {

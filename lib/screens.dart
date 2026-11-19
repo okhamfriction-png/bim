@@ -235,7 +235,7 @@ class _NowScreenState extends State<NowScreen> {
             margin: const EdgeInsets.fromLTRB(16, 6, 16, 6),
             header: PanelHead('À faire dans le sprint',
                 icon: Icons.flag_rounded, color: p.accent, count: '${queue.length}'),
-            children: [_DragList(queue)],
+            children: [_DragList(queue, lanes: true)],
           ),
       ]),
     );
@@ -489,7 +489,7 @@ class _BacklogScreenState extends State<BacklogScreen> {
               ),
             ]),
           ),
-        if (open.isNotEmpty) _DragList(open),
+        _DragList(open, lanes: true),
       ],
     );
   }
@@ -675,19 +675,56 @@ class _BacklogScreenState extends State<BacklogScreen> {
 /// Ranger une tâche dans un sprint, ou la remettre au backlog.
 /// Pour une tâche archivée : la changer de sprint, sprints passés compris.
 /// Une liste de tâches qu'on réordonne en restant appuyé sur une ligne puis en la glissant.
+/// Avec [lanes], la liste est découpée en couloirs P0 à P4 : déposer une tâche dans un
+/// couloir lui donne cette priorité.
 class _DragList extends StatelessWidget {
   final List<Task> tasks;
-  const _DragList(this.tasks);
+  final bool lanes;
+  const _DragList(this.tasks, {this.lanes = false});
+
+  static const laneNames = ['Non négociable', 'Important', 'Si le temps', 'Petite tâche', 'Parking'];
+
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
+    // Lignes affichées : un en-tête de couloir (tâche nulle) ou une tâche.
+    final rows = <(Task?, int)>[
+      if (lanes)
+        for (var i = 0; i <= 4; i++) ...[
+          (null, i),
+          for (final t in tasks.where((t) => t.priority == i)) (t, i),
+        ]
+      else
+        for (final t in tasks) (t, t.priority),
+    ];
+    void drop(int from, int to) {
+      final t = rows[from].$1;
+      if (t == null) return;
+      if (to > from) to--;
+      final l = [...rows]..removeAt(from);
+      l.insert(to, (t, 0));
+      Task? at(int i) => i >= 0 && i < l.length ? l[i].$1 : null;
+      if (!lanes) {
+        store.moveTask(tasks, tasks.indexOf(t), to);
+        return;
+      }
+      var lane = 0;
+      for (var i = to - 1; i >= 0; i--) {
+        if (l[i].$1 == null) {
+          lane = l[i].$2;
+          break;
+        }
+      }
+      store.placeTask(t, lane, at(to - 1), at(to + 1));
+    }
+
     return ReorderableListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       buildDefaultDragHandles: false,
-      itemCount: tasks.length,
+      itemCount: rows.length,
       onReorderStart: (_) => HapticFeedback.mediumImpact(),
-      onReorder: (from, to) => store.moveTask(tasks, from, to > from ? to - 1 : to),
+      onReorder: drop,
       proxyDecorator: (child, _, _) => Material(
           color: p.card,
           elevation: 8,
@@ -695,15 +732,38 @@ class _DragList extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           clipBehavior: Clip.antiAlias,
           child: child),
-      itemBuilder: (context, i) => ReorderableDelayedDragStartListener(
-        key: ValueKey(tasks[i].id),
-        index: i,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-              border: i == 0 ? null : Border(top: BorderSide(color: p.line))),
-          child: _Tile(tasks[i]),
-        ),
-      ),
+      itemBuilder: (context, i) {
+        final (t, lane) = rows[i];
+        if (t == null) {
+          final n = tasks.where((x) => x.priority == lane).length;
+          return Container(
+            key: ValueKey('couloir$lane'),
+            decoration: BoxDecoration(
+                color: Color.alphaBlend(prioColors[lane].withValues(alpha: .10), p.soft),
+                border: i == 0 ? null : Border(top: BorderSide(color: p.line))),
+            padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+            child: Row(children: [
+              PrioChip(lane),
+              const SizedBox(width: 9),
+              Expanded(
+                  child: Text(laneNames[lane],
+                      style: TextStyle(
+                          fontSize: 12.5, fontWeight: FontWeight.w800, color: p.sub))),
+              Text(n == 0 ? 'vide' : '$n',
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: p.sub)),
+            ]),
+          );
+        }
+        return ReorderableDelayedDragStartListener(
+          key: ValueKey(t.id),
+          index: i,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+                border: i == 0 ? null : Border(top: BorderSide(color: p.line))),
+            child: _Tile(t),
+          ),
+        );
+      },
     );
   }
 }
