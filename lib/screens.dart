@@ -121,8 +121,6 @@ class _NowScreenState extends State<NowScreen> {
 
     // La tâche en gros plan, puis le reste du sprint par priorité.
     final queue = store.queue;
-    final t = queue.firstOrNull;
-    final rest = queue.skip(1).toList();
     Widget pad(Widget w) => Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: w);
 
     return LayoutBuilder(
@@ -228,61 +226,24 @@ class _NowScreenState extends State<NowScreen> {
                     style: TextStyle(fontWeight: FontWeight.w800))),
           )),
         const SizedBox(height: 8),
-        pad(SizedBox(
-          height: (box.maxHeight * .58).clamp(320.0, 540.0),
-          child: Stack(alignment: Alignment.center, children: [
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 350),
-              transitionBuilder: (c, a) => FadeTransition(
-                  opacity: a,
-                  child: SlideTransition(
-                      position: Tween(begin: const Offset(0, .08), end: Offset.zero).animate(a),
-                      child: c)),
-              child: t != null
-                  ? _Card(
-                      key: ValueKey(t.id),
-                      task: t,
-                      onDone: () => done(t),
-                      onSub: () {
-                        HapticFeedback.lightImpact();
-                        if (t.status == 'done') cheer();
-                      })
-                  : const _Empty(key: ValueKey('vide')),
-            ),
-            IgnorePointer(
-              child: AnimatedScale(
-                scale: bim ? 1 : .4,
-                duration: const Duration(milliseconds: 350),
-                curve: Curves.elasticOut,
-                child: AnimatedOpacity(
-                  opacity: bim ? 1 : 0,
-                  duration: const Duration(milliseconds: 200),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 34, vertical: 16),
-                    decoration: BoxDecoration(
-                        color: p.accent, borderRadius: BorderRadius.circular(99)),
-                    child: Text('Bim !',
-                        style: TextStyle(
-                            fontSize: 44, fontWeight: FontWeight.w900, color: p.onAccent)),
-                  ),
-                ),
-              ),
-            ),
-          ]),
-        )),
-        if (rest.isNotEmpty)
+        if (queue.isEmpty)
+          pad(SizedBox(
+              height: (box.maxHeight * .5).clamp(280.0, 460.0),
+              child: const _Empty(key: ValueKey('vide'))))
+        else
           Panel(
-            margin: const EdgeInsets.fromLTRB(16, 14, 16, 6),
-            header: PanelHead('Ensuite dans le sprint',
-                icon: Icons.flag_rounded, color: p.accent, count: '${rest.length}'),
-            children: [for (final x in rest) _Tile(x, key: ValueKey(x.id))],
+            margin: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+            header: PanelHead('À faire dans le sprint',
+                icon: Icons.flag_rounded, color: p.accent, count: '${queue.length}'),
+            children: [for (final x in queue) _Tile(x, key: ValueKey(x.id))],
           ),
       ]),
     );
   }
 }
 
-/// La tâche en cours : une carte fermée, étiquettes en haut, « Terminé » en bas.
+/// La tâche en gros plan (plus affichée : Maintenant montre la liste du sprint).
+// ignore: unused_element
 class _Card extends StatelessWidget {
   final Task task;
   final VoidCallback onDone, onSub;
