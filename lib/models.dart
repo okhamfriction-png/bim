@@ -46,11 +46,18 @@ class Sub {
   String title;
   bool done;
   int? doneAt; // instant où la case a été cochée
-  Sub(this.title, {this.done = false, this.doneAt});
+  String result; // résultat propre à la sous-tâche (score d'une prise d'échauffement)
+  Sub(this.title, {this.done = false, this.doneAt, this.result = ''});
   factory Sub.fromJson(Map<String, dynamic> j) => Sub((j['title'] ?? '') as String,
-      done: (j['done'] ?? false) as bool, doneAt: (j['doneAt'] as num?)?.toInt());
-  Map<String, dynamic> toJson() =>
-      {'title': title, 'done': done, if (doneAt != null) 'doneAt': doneAt};
+      done: (j['done'] ?? false) as bool,
+      doneAt: (j['doneAt'] as num?)?.toInt(),
+      result: '${j['result'] ?? ''}');
+  Map<String, dynamic> toJson() => {
+        'title': title,
+        'done': done,
+        if (doneAt != null) 'doneAt': doneAt,
+        if (result.isNotEmpty) 'result': result,
+      };
 }
 
 /// Une tâche du backlog. Format partagé avec la commande `bin/bim`.
@@ -175,6 +182,10 @@ class Task {
 
   /// Unités à livrer : une par sous-tâche, sinon la tâche elle-même.
   bool get whole => wholeKinds.contains(kindOf);
+
+  /// Record du sprint : le meilleur score (en secondes) noté sur les prises, 0 si aucun.
+  int get record => subs.fold(
+      0, (a, s) => max(a, int.tryParse(RegExp(r'\d+').firstMatch(s.result)?.group(0) ?? '') ?? 0));
   int get unitsTotal => subs.isEmpty || whole ? 1 : subs.length;
   int get unitsDone => subs.isEmpty || whole ? (status == 'done' ? 1 : 0) : subsDone;
   Sub? get nextSub => subs.where((s) => !s.done).firstOrNull;

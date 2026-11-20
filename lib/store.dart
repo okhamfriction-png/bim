@@ -450,7 +450,9 @@ class Store extends ChangeNotifier {
   String unitsLabel(Task t) {
     final k = kinds[t.kindOf];
     if (k == null || t.subs.isEmpty) return '';
-    return t.whole ? '${t.subsDone}/${t.subs.length} prises' : '${t.unitsDone}/${t.unitsTotal} ${k.$2}';
+    return t.whole
+        ? '${t.subsDone}/${t.subs.length} prises${t.record > 0 ? ' · record ${t.record} s' : ''}'
+        : '${t.unitsDone}/${t.unitsTotal} ${k.$2}';
   }
 
   /// Points d'un groupe de tâches : « 3/13 pts » dès qu'il y en a de gagnés, sinon « 13 pts ».
@@ -603,6 +605,11 @@ class Store extends ChangeNotifier {
     s.done = !s.done;
     s.doneAt = s.done ? nowMs() : null;
     _settle(t);
+    touch(t);
+  }
+
+  void setSubResult(Task t, Sub s, String v) {
+    s.result = v.trim();
     touch(t);
   }
 

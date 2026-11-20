@@ -703,9 +703,14 @@ class SubCheck extends StatelessWidget {
     final p = Pal.of(context);
     return InkWell(
       borderRadius: BorderRadius.circular(10),
-      onTap: () {
+      onTap: () async {
         store.toggleSub(task, sub);
         onChanged?.call();
+        // Une prise d'échauffement cochée : on note tout de suite son score.
+        if (task.whole && sub.done && sub.result.isEmpty) {
+          await askScore(context, task, sub);
+          onChanged?.call();
+        }
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 7),
@@ -723,6 +728,7 @@ class SubCheck extends StatelessWidget {
                       decoration: sub.done ? TextDecoration.lineThrough : null)),
             ),
           ),
+          if (task.whole) ScorePill(task, sub, onChanged: onChanged),
         ]),
       ),
     );
@@ -997,6 +1003,59 @@ class _InlineVideoState extends State<InlineVideo> {
             ]),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Demande le score d'une prise : les secondes tenues avant le premier « euh ».
+Future<void> askScore(BuildContext context, Task t, Sub s) async {
+  final c = TextEditingController(text: s.result);
+  final v = await showDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(s.title),
+      content: TextField(
+        controller: c,
+        autofocus: true,
+        keyboardType: TextInputType.number,
+        decoration: const InputDecoration(
+            labelText: 'Score', hintText: 'Secondes avant le premier « euh »', suffixText: 's'),
+        onSubmitted: (x) => Navigator.pop(ctx, x),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Plus tard')),
+        FilledButton(onPressed: () => Navigator.pop(ctx, c.text), child: const Text('Noter')),
+      ],
+    ),
+  );
+  if (v != null) store.setSubResult(t, s, v);
+}
+
+/// Pastille du score d'une prise ; un appui permet de le corriger.
+class ScorePill extends StatelessWidget {
+  final Task task;
+  final Sub sub;
+  final VoidCallback? onChanged;
+  const ScorePill(this.task, this.sub, {this.onChanged, super.key});
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final has = sub.result.isNotEmpty;
+    return InkWell(
+      borderRadius: BorderRadius.circular(99),
+      onTap: () async {
+        await askScore(context, task, sub);
+        onChanged?.call();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+        decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(99), border: Border.all(color: p.line)),
+        child: Text(
+            has ? (int.tryParse(sub.result) != null ? '${sub.result} s' : sub.result) : 'Score',
+            style: TextStyle(
+                fontSize: 12.5, fontWeight: FontWeight.w800, color: has ? p.ink : p.sub)),
       ),
     );
   }

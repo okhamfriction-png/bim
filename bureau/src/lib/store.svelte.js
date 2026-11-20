@@ -90,7 +90,10 @@ export function kindOf(t) {
 }
 export const iconOf = (t) => (t.call ? '📞' : KINDS[kindOf(t)]?.icon ?? CAT_ICON[catOf(t)]);
 const subs = (t) => t.subs ?? [];
-const whole = (t) => WHOLE.has(kindOf(t));
+export const whole = (t) => WHOLE.has(kindOf(t));
+/** Record du sprint : le meilleur score noté sur les prises, 0 si aucun. */
+export const recordOf = (t) =>
+  subs(t).reduce((a, s) => Math.max(a, parseInt(String(s.result ?? '').match(/\d+/)?.[0] ?? '0', 10)), 0);
 export const unitsTotal = (t) => (whole(t) ? 1 : subs(t).length || 1);
 export const unitsDone = (t) =>
   subs(t).length && !whole(t) ? subs(t).filter((s) => s.done).length : t.status === 'done' ? 1 : 0;
@@ -117,7 +120,7 @@ export function unitsLabel(t) {
   const k = KINDS[kindOf(t)];
   if (!k || !subs(t).length) return '';
   return whole(t)
-    ? `${subs(t).filter((s) => s.done).length}/${subs(t).length} prises`
+    ? `${subs(t).filter((s) => s.done).length}/${subs(t).length} prises${recordOf(t) ? ` · record ${recordOf(t)} s` : ''}`
     : `${unitsDone(t)}/${unitsTotal(t)} ${k.unit}`;
 }
 /** Points d'un groupe de tâches : « 3/13 pts » dès qu'il y en a de gagnés, sinon « 13 pts ». */
@@ -315,6 +318,12 @@ export function toggleSub(t, s) {
   if (s.done) s.doneAt = Date.now();
   else delete s.doneAt;
   settle(t);
+  touch(t);
+}
+export function setSubResult(t, s, v) {
+  const x = String(v ?? '').trim();
+  if (x) s.result = x;
+  else delete s.result;
   touch(t);
 }
 export function addSub(t, title) {

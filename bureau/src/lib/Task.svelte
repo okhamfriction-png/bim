@@ -1,7 +1,7 @@
 <script>
   import {
     PRIO, CATS, KINDS, iconOf, pointsLabel, unitsLabel, sprints, dateOf, catOf,
-    complete, reopen, toggleSub, addSub, removeSub, remove, touch,
+    complete, reopen, toggleSub, addSub, removeSub, remove, touch, whole, setSubResult,
   } from './store.svelte.js';
 
   let { t, drag = true } = $props();
@@ -59,6 +59,11 @@
             <label class="sub" class:on={s.done}>
               <input type="checkbox" checked={s.done} onchange={() => toggleSub(t, s)} />
               <span>{s.title}</span>
+              {#if whole(t)}
+                <input class="score" type="number" min="0" placeholder="score (s)" title="Secondes avant le premier « euh »"
+                  value={s.result ?? ''} onclick={(e) => e.preventDefault()}
+                  onchange={(e) => setSubResult(t, s, e.currentTarget.value)} />
+              {/if}
               <button class="x" title="Retirer" aria-label="Retirer la sous-tâche" onclick={() => removeSub(t, s)}>×</button>
             </label>
           {/each}
@@ -138,6 +143,7 @@
   .sub { display: flex; align-items: center; gap: 9px; padding: 4px 0; }
   .sub input { width: 17px; height: 17px; accent-color: var(--ok); flex: none; }
   .sub span { flex: 1; }
+  .sub input.score { width: 92px; height: auto; flex: none; padding: 2px 6px; font-size: 12.5px; }
   .sub.on span { color: var(--sub); text-decoration: line-through; }
   .x { color: var(--sub); font-size: 18px; padding: 0 6px; visibility: hidden; }
   .sub:hover .x { visibility: visible; }
