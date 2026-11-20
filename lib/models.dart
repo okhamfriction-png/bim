@@ -33,6 +33,9 @@ const kinds = <String, (String, String, int)>{
 /// Demandes de rue dans un bloc.
 const askPerBlock = 20;
 
+/// Un jeton bonus à dépenser tous les 30 points gagnés en abordage de rue.
+const bonusEvery = 30;
+
 /// Une sous-tâche : un titre et une case à cocher.
 class Sub {
   String title;
@@ -252,6 +255,7 @@ class Schedule {
   Map<String, int> targets; // cible de points corrigée à la main, par sprint
   int targetKids; // cible d'une semaine avec enfants
   int targetFree; // cible d'une semaine sans enfants
+  List<int> spent; // jetons bonus dépensés : l'instant de chaque dépense (ms)
   bool hasPoints; // faux si le fichier lu ne connaissait pas encore les points
 
   Schedule({
@@ -270,8 +274,10 @@ class Schedule {
     Map<String, int>? targets,
     this.targetKids = 70,
     this.targetFree = 90,
+    List<int>? spent,
     this.hasPoints = true,
-  })  : coef = {for (final k in kinds.entries) k.key: coef?[k.key] ?? k.value.$3},
+  })  : spent = spent ?? [],
+        coef = {for (final k in kinds.entries) k.key: coef?[k.key] ?? k.value.$3},
         targets = targets ?? {},
         blocks = blocks ?? [],
         sprints = sprints ?? [],
@@ -301,6 +307,7 @@ class Schedule {
         targets: _ints(j['points']?['targets']),
         targetKids: ((j['points']?['kids'] ?? 70) as num).toInt(),
         targetFree: ((j['points']?['free'] ?? 90) as num).toInt(),
+        spent: [for (final x in (j['points']?['spent'] ?? []) as List) (x as num).toInt()],
         hasPoints: j['points'] != null,
       );
 
@@ -328,6 +335,7 @@ class Schedule {
               targets.entries.toList()..sort((a, b) => a.key.compareTo(b.key))),
           'kids': targetKids,
           'free': targetFree,
+          'spent': spent.toList()..sort(),
         },
       };
 

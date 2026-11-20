@@ -524,6 +524,23 @@ class Store extends ChangeNotifier {
         '${n > 0 ? ', soit $n bloc${n > 1 ? 's' : ''} de rue' : ''}.';
   }
 
+  /// Points gagnés en abordage de rue depuis le début, tous sprints confondus.
+  int get rueTotal => _value({'rue': unitsBetween(0, 9007199254740991)['rue'] ?? 0});
+
+  int get bonusEarned => rueTotal ~/ bonusEvery;
+
+  /// Jetons bonus disponibles : un tous les 30 points de rue, moins ceux dépensés.
+  int get bonusLeft => (bonusEarned - schedule.spent.length).clamp(0, 9999);
+
+  /// Points de rue déjà gagnés vers le prochain jeton.
+  int get bonusProgress => rueTotal % bonusEvery;
+
+  void spendBonus() {
+    if (bonusLeft == 0) return;
+    schedule.spent.add(nowMs());
+    _saveSchedule();
+  }
+
   void setCoef(String kind, int v) {
     schedule.coef[kind] = v.clamp(0, 20);
     _saveSchedule();
@@ -714,6 +731,7 @@ class Store extends ChangeNotifier {
       targets: {...(identical(pts, l) ? r : l).targets, ...pts.targets},
       targetKids: pts.targetKids,
       targetFree: pts.targetFree,
+      spent: {...l.spent, ...r.spent}.toList()..sort(), // une dépense n'est jamais perdue
     );
   }
 

@@ -1,7 +1,7 @@
 <script>
   import {
     app, sync, thisMonday, sprints, sprintTasks, looseTasks, doneThisWeek, dateOf, addDays,
-    valueWeek, valueToday, targetOf, plannedIn, p0In,
+    valueWeek, valueToday, bonus, BONUS_EVERY, targetOf, plannedIn, p0In,
   } from './lib/store.svelte.js';
   import Lanes from './lib/Lanes.svelte';
   import Task from './lib/Task.svelte';
@@ -20,6 +20,7 @@
   const cur = $derived(thisMonday());
   const target = $derived(targetOf(cur));
   const value = $derived(valueWeek());
+  const tokens = $derived(bonus());
   const fmtDate = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
   const fmtShort = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' });
   const range = (s) => `${fmtShort.format(dateOf(s))} – ${fmtShort.format(addDays(dateOf(s), 6))}`;
@@ -38,6 +39,9 @@
     <div class="value" title="Points de valeur gagnés cette semaine">
       <span><b>{value}</b> / {target} pts <small>+{valueToday()} aujourd'hui</small></span>
       <div class="bar"><i style="width: {target ? Math.min(100, (100 * value) / target) : 0}%"></i></div>
+      <span class="bonus" class:has={tokens.left > 0} title="Un jeton tous les {BONUS_EVERY} points d'abordage de rue ; il se dépense dans l'appli du téléphone">
+        🎟️ {tokens.left > 0 ? `${tokens.left} jeton${tokens.left > 1 ? 's' : ''} bonus à dépenser` : `Jeton bonus : ${tokens.progress} / ${BONUS_EVERY} pts de rue`}
+      </span>
     </div>
     <span class="grow"></span>
     <button class="sync {app.sync}" onclick={sync} title={app.sync === 'error' ? app.error : 'Synchroniser'}>
@@ -110,6 +114,8 @@
   .value { min-width: 220px; display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; }
   .value b { font-size: 16px; }
   .value small { color: var(--sub); margin-left: 8px; }
+  .bonus { color: var(--sub); font-size: 12.5px; }
+  .bonus.has { color: #d97706; font-weight: 800; }
   .bar { height: 6px; border-radius: 99px; background: var(--line); overflow: hidden; }
   .bar i { display: block; height: 100%; background: var(--ok); border-radius: 99px; transition: width .3s; }
   .grow { flex: 1; }

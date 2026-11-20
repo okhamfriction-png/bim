@@ -152,6 +152,16 @@ function valueBetween(from, to) {
   }
   return n;
 }
+/** Jetons bonus : un tous les 30 points de rue gagnés depuis le début, moins ceux dépensés. */
+export const BONUS_EVERY = 30;
+export const bonus = () => {
+  let rue = 0;
+  for (const t of app.doc.tasks) {
+    if (!t.deleted && kindOf(t) === 'rue') rue += coefOf(t) * deliveries(t).length;
+  }
+  const spent = sched().points?.spent?.length ?? 0;
+  return { left: Math.max(0, Math.floor(rue / BONUS_EVERY) - spent), progress: rue % BONUS_EVERY };
+};
 export const valueWeek = () => {
   const m = mondayOf(new Date(app.now));
   return valueBetween(m.getTime(), addDays(m, 7).getTime());

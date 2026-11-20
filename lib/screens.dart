@@ -186,6 +186,8 @@ class _NowScreenState extends State<NowScreen> {
                       backgroundColor: p.line,
                       color: _statusColors['tenu']),
                 ),
+                const SizedBox(height: 8),
+                const BonusRow(),
               ]),
             ),
           if (agenda.isNotEmpty)
@@ -1796,6 +1798,8 @@ class ReviewPage extends StatelessWidget {
                       '${store.gapText.isEmpty ? 'Cible atteinte.' : store.gapText}',
                       style: TextStyle(
                           color: p.ink, fontSize: 14.5, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 10),
+                  const BonusRow(),
                   h('SCORE DE LA SEMAINE'),
                   Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
                     Text('${store.weekScore}',
@@ -1919,5 +1923,54 @@ class ReviewPage extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Jetons bonus : un tous les 30 points gagnés en abordage de rue, à dépenser quand on veut.
+class BonusRow extends StatelessWidget {
+  const BonusRow({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final n = store.bonusLeft;
+    final gold = const Color(0xFFF59E0B);
+    return Row(children: [
+      Icon(Icons.confirmation_number_rounded, size: 19, color: n > 0 ? gold : p.sub),
+      const SizedBox(width: 9),
+      Expanded(
+        child: Text(
+            n > 0
+                ? '$n jeton${n > 1 ? 's' : ''} bonus à dépenser'
+                : 'Jeton bonus : ${store.bonusProgress} / $bonusEvery pts de rue',
+            style: TextStyle(
+                fontSize: 14.5,
+                fontWeight: n > 0 ? FontWeight.w800 : FontWeight.w700,
+                color: n > 0 ? p.ink : p.sub)),
+      ),
+      if (n > 0)
+        FilledButton(
+          style: FilledButton.styleFrom(
+              backgroundColor: gold,
+              foregroundColor: Colors.black,
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 14)),
+          onPressed: () async {
+            final ok = await showDialog<bool>(
+              context: context,
+              builder: (c) => AlertDialog(
+                title: const Text('Dépenser un jeton bonus ?'),
+                content: Text(n > 1 ? 'Il t\'en restera ${n - 1}.' : 'C\'est ton dernier.'),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Annuler')),
+                  FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Dépenser')),
+                ],
+              ),
+            );
+            if (ok == true) store.spendBonus();
+          },
+          child: const Text('Dépenser', style: TextStyle(fontWeight: FontWeight.w800)),
+        ),
+    ]);
   }
 }
