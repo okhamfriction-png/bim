@@ -59,6 +59,7 @@ const kindIcons = <String, IconData>{
   'montee': Icons.movie_edit,
   'short': Icons.smartphone_rounded,
   'rangement': Icons.inventory_2_rounded,
+  'echauffement': Icons.local_fire_department_rounded,
 };
 
 IconData taskIcon(Task t) => kindIcons[t.kindOf] ?? iconOf(t.cat);

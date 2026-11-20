@@ -420,7 +420,21 @@ class Store extends ChangeNotifier {
 
   // ---- Points de valeur : la valeur livrée, comptée quand la case est cochée ----
 
-  int coefOf(Task t) => schedule.coef[t.kindOf] ?? 0;
+  int coefOf(Task t) {
+    final k = t.kindOf;
+    // Un seul échauffement payé par sprint : le plus ancien.
+    if (t.whole &&
+        t.sprint != null &&
+        tasks.any((o) =>
+            !identical(o, t) &&
+            !o.deleted &&
+            o.sprint == t.sprint &&
+            o.kindOf == k &&
+            (o.createdAt < t.createdAt || (o.createdAt == t.createdAt && o.id.compareTo(t.id) < 0)))) {
+      return 0;
+    }
+    return schedule.coef[k] ?? 0;
+  }
   int plannedOf(Task t) => coefOf(t) * t.unitsTotal;
   int earnedOf(Task t) => coefOf(t) * t.unitsDone;
 
@@ -435,7 +449,8 @@ class Store extends ChangeNotifier {
   /// « 0/3 blocs », vide pour une tâche sans sous-tâche à points.
   String unitsLabel(Task t) {
     final k = kinds[t.kindOf];
-    return k == null || t.subs.isEmpty ? '' : '${t.unitsDone}/${t.unitsTotal} ${k.$2}';
+    if (k == null || t.subs.isEmpty) return '';
+    return t.whole ? '${t.subsDone}/${t.subs.length} prises' : '${t.unitsDone}/${t.unitsTotal} ${k.$2}';
   }
 
   /// Points d'un groupe de tâches : « 3/13 pts » dès qu'il y en a de gagnés, sinon « 13 pts ».
@@ -451,14 +466,14 @@ class Store extends ChangeNotifier {
     if (k == null) return '';
     final c = coefOf(t);
     String pts(int n) => '$n pt${n > 1 ? 's' : ''}';
-    return t.subs.isEmpty
+    return t.subs.isEmpty || t.whole
         ? pts(c)
         : '${t.unitsDone}/${t.unitsTotal} ${k.$2} · ${earnedOf(t)}/${pts(plannedOf(t))}';
   }
 
   /// Instants où les unités d'une tâche ont été livrées.
   Iterable<int> _deliveries(Task t) sync* {
-    if (t.subs.isEmpty) {
+    if (t.subs.isEmpty || t.whole) {
       if (t.status == 'done') yield t.doneAt ?? t.updatedAt;
     } else {
       for (final s in t.subs) {
@@ -471,7 +486,7 @@ class Store extends ChangeNotifier {
   Map<String, int> unitsBetween(int from, int to) {
     final out = <String, int>{};
     for (final t in tasks) {
-      if (t.deleted || t.kindOf.isEmpty) continue;
+      if (t.deleted || t.kindOf.isEmpty || coefOf(t) == 0) continue;
       final n = _deliveries(t).where((d) => d >= from && d < to).length;
       if (n > 0) out[t.kindOf] = (out[t.kindOf] ?? 0) + n;
     }

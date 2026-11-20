@@ -12,7 +12,10 @@ export const KINDS = {
   montee: { name: 'Vidéo montée', unit: 'vidéos', icon: '🎬', coef: 2 },
   short: { name: 'Short', unit: 'shorts', icon: '📱', coef: 1 },
   rangement: { name: 'Rangement', unit: 'jours', icon: '🗂️', coef: 1 },
+  echauffement: { name: 'Échauffement', unit: 'sprints', icon: '🔥', coef: 2 },
 };
+/** Types payés une seule fois, quand la tâche entière est validée. */
+const WHOLE = new Set(['echauffement']);
 
 const read = (k, d) => {
   try {
@@ -82,16 +85,23 @@ export function kindOf(t) {
   if (s.startsWith('vidéo montée')) return 'montee';
   if (s.startsWith('short ·')) return 'short';
   if (s.startsWith('rangement ·')) return 'rangement';
+  if (s.startsWith('échauffement ·')) return 'echauffement';
   return '';
 }
 export const iconOf = (t) => (t.call ? '📞' : KINDS[kindOf(t)]?.icon ?? CAT_ICON[catOf(t)]);
 const subs = (t) => t.subs ?? [];
-export const unitsTotal = (t) => subs(t).length || 1;
+const whole = (t) => WHOLE.has(kindOf(t));
+export const unitsTotal = (t) => (whole(t) ? 1 : subs(t).length || 1);
 export const unitsDone = (t) =>
-  subs(t).length ? subs(t).filter((s) => s.done).length : t.status === 'done' ? 1 : 0;
+  subs(t).length && !whole(t) ? subs(t).filter((s) => s.done).length : t.status === 'done' ? 1 : 0;
 export const coefOf = (t) => {
   const k = kindOf(t);
-  return k ? sched().points?.coef?.[k] ?? KINDS[k].coef : 0;
+  if (!k) return 0;
+  // Un seul échauffement payé par sprint : le plus ancien.
+  if (WHOLE.has(k) && t.sprint && app.doc.tasks.some((o) =>
+      o !== t && !o.deleted && o.sprint === t.sprint && kindOf(o) === k &&
+      (o.createdAt < t.createdAt || (o.createdAt === t.createdAt && o.id < t.id)))) return 0;
+  return sched().points?.coef?.[k] ?? KINDS[k].coef;
 };
 export const plannedOf = (t) => coefOf(t) * unitsTotal(t);
 export const earnedOf = (t) => coefOf(t) * unitsDone(t);
@@ -105,7 +115,10 @@ export function pointsLabel(t) {
 /** « 0/3 blocs », vide pour une tâche sans sous-tâche à points. */
 export function unitsLabel(t) {
   const k = KINDS[kindOf(t)];
-  return k && subs(t).length ? `${unitsDone(t)}/${unitsTotal(t)} ${k.unit}` : '';
+  if (!k || !subs(t).length) return '';
+  return whole(t)
+    ? `${subs(t).filter((s) => s.done).length}/${subs(t).length} prises`
+    : `${unitsDone(t)}/${unitsTotal(t)} ${k.unit}`;
 }
 /** Points d'un groupe de tâches : « 3/13 pts » dès qu'il y en a de gagnés, sinon « 13 pts ». */
 export function lanePoints(tasks) {
@@ -118,7 +131,7 @@ export function valueLabel(t) {
   const k = KINDS[kindOf(t)];
   if (!k) return '';
   const pts = (n) => `${n} pt${n > 1 ? 's' : ''}`;
-  return subs(t).length
+  return subs(t).length && !whole(t)
     ? `${unitsDone(t)}/${unitsTotal(t)} ${k.unit} · ${earnedOf(t)}/${pts(plannedOf(t))}`
     : pts(coefOf(t));
 }
@@ -139,7 +152,7 @@ export const doneThisWeek = () => {
 // ---- Points de valeur ----
 
 function deliveries(t) {
-  if (!subs(t).length) return t.status === 'done' ? [t.doneAt ?? t.updatedAt] : [];
+  if (!subs(t).length || whole(t)) return t.status === 'done' ? [t.doneAt ?? t.updatedAt] : [];
   return subs(t)
     .filter((s) => s.done)
     .map((s) => s.doneAt ?? t.doneAt ?? t.updatedAt);

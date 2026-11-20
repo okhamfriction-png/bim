@@ -28,7 +28,12 @@ const kinds = <String, (String, String, int)>{
   'montee': ('Vidéo montée', 'vidéos', 2),
   'short': ('Short', 'shorts', 1),
   'rangement': ('Rangement', 'jours', 1),
+  'echauffement': ('Échauffement', 'sprints', 2),
 };
+
+/// Types payés une seule fois, quand la tâche entière est validée : ses sous-tâches
+/// (les prises à publier) ne rapportent rien une par une.
+const wholeKinds = {'echauffement'};
 
 /// Demandes de rue dans un bloc.
 const askPerBlock = 20;
@@ -164,12 +169,14 @@ class Task {
     if (s.startsWith('vidéo montée')) return 'montee';
     if (s.startsWith('short ·')) return 'short';
     if (s.startsWith('rangement ·')) return 'rangement';
+    if (s.startsWith('échauffement ·')) return 'echauffement';
     return '';
   }
 
   /// Unités à livrer : une par sous-tâche, sinon la tâche elle-même.
-  int get unitsTotal => subs.isEmpty ? 1 : subs.length;
-  int get unitsDone => subs.isEmpty ? (status == 'done' ? 1 : 0) : subsDone;
+  bool get whole => wholeKinds.contains(kindOf);
+  int get unitsTotal => subs.isEmpty || whole ? 1 : subs.length;
+  int get unitsDone => subs.isEmpty || whole ? (status == 'done' ? 1 : 0) : subsDone;
   Sub? get nextSub => subs.where((s) => !s.done).firstOrNull;
   bool get pickedToday => pickedOn == ymd(DateTime.now());
   bool doneOn(DateTime d) =>

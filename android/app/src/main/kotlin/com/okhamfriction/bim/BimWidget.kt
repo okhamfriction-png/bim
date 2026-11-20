@@ -92,6 +92,7 @@ class BimWidget : AppWidgetProvider() {
                     "montee" -> "🎬"
                     "short" -> "📱"
                     "rangement" -> "🗂️"
+                    "echauffement" -> "🔥"
                     else -> catIcon
                 }
                 // Icône, priorité en couleur, titre : pas de fond.
