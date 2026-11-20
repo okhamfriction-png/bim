@@ -940,13 +940,14 @@ class _TileState extends State<_Tile> {
                 color: p.soft, border: Border(top: BorderSide(color: p.line))),
             padding: const EdgeInsets.fromLTRB(16, 12, 14, 12),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              // Les cases à cocher d'abord : pas besoin de passer le descriptif pour cocher.
+              if (t.subs.isNotEmpty) ...[SubList(t), const SizedBox(height: 12)],
               if (t.note.isEmpty && t.links.isEmpty)
                 Text('Pas de descriptif.', style: TextStyle(color: p.sub))
               else
                 TaskBody(t),
               const SizedBox(height: 12),
-              SubList(t),
-              const SizedBox(height: 12),
+              if (t.subs.isEmpty) ...[SubList(t), const SizedBox(height: 12)],
               Wrap(spacing: 8, runSpacing: 4, children: [
                 if (t.open && !t.parked && !t.call)
                   action(

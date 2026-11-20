@@ -38,6 +38,17 @@ const wholeKinds = {'echauffement'};
 /// Demandes de rue dans un bloc.
 const askPerBlock = 20;
 
+/// Ce qu'on note à la fin d'un bloc de rue : (clé, libellé, vrai si c'est un nombre).
+const blockFields = <(String, String, bool)>[
+  ('approches', 'Approches (sur 20)', true),
+  ('avant', 'Abonnés de la page avant', true),
+  ('apres', 'Abonnés de la page après', true),
+  ('demandes', 'Demandes de place faites', true),
+  ('oui', 'Nombre de oui', true),
+  ('objection', 'Objection la plus entendue', false),
+  ('changer', 'Une chose à changer au bloc suivant', false),
+];
+
 /// Un jeton bonus à dépenser tous les 30 points gagnés en abordage de rue.
 const bonusEvery = 30;
 
@@ -47,16 +58,33 @@ class Sub {
   bool done;
   int? doneAt; // instant où la case a été cochée
   String result; // résultat propre à la sous-tâche (score d'une prise d'échauffement)
-  Sub(this.title, {this.done = false, this.doneAt, this.result = ''});
+  Map<String, dynamic> data; // résultat chiffré d'un bloc de rue (clés de `blockFields`)
+  Sub(this.title, {this.done = false, this.doneAt, this.result = '', Map<String, dynamic>? data})
+      : data = data ?? {};
+
+  int? count(String k) => (data[k] as num?)?.toInt();
+
+  /// Abonnés gagnés pendant le bloc, si les deux compteurs sont notés.
+  int? get gained => count('avant') != null && count('apres') != null ? count('apres')! - count('avant')! : null;
+
+  /// « 20/20 · +3 abonnés · 1/4 places », vide si rien n'est noté.
+  String get blockSummary => [
+        if (count('approches') != null) '${count('approches')}/$askPerBlock',
+        if (gained != null) '${gained! >= 0 ? '+' : ''}$gained ab.',
+        if (count('demandes') != null || count('oui') != null)
+          '${count('oui') ?? 0}/${count('demandes') ?? 0} places',
+      ].join(' · ');
   factory Sub.fromJson(Map<String, dynamic> j) => Sub((j['title'] ?? '') as String,
       done: (j['done'] ?? false) as bool,
       doneAt: (j['doneAt'] as num?)?.toInt(),
-      result: '${j['result'] ?? ''}');
+      result: '${j['result'] ?? ''}',
+      data: j['data'] is Map ? Map<String, dynamic>.from(j['data'] as Map) : null);
   Map<String, dynamic> toJson() => {
         'title': title,
         'done': done,
         if (doneAt != null) 'doneAt': doneAt,
         if (result.isNotEmpty) 'result': result,
+        if (data.isNotEmpty) 'data': data,
       };
 }
 

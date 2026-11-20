@@ -1,12 +1,13 @@
 <script>
   import {
     PRIO, CATS, KINDS, iconOf, pointsLabel, unitsLabel, sprints, dateOf, catOf,
-    complete, reopen, toggleSub, addSub, removeSub, remove, touch, whole, setSubResult,
+    complete, reopen, toggleSub, addSub, removeSub, remove, touch, whole, setSubResult, kindOf, BLOCK_FIELDS, blockSummary, hasData, setSubField,
   } from './store.svelte.js';
 
   let { t, drag = true } = $props();
   let open = $state(false);
   let sub = $state('');
+  let noting = $state(-1); // bloc de rue dont on remplit le bilan
   const done = $derived(t.status === 'done');
   const label = $derived(unitsLabel(t));
   const points = $derived(pointsLabel(t));
@@ -55,7 +56,7 @@
     <div class="body">
       {#if t.subs?.length}
         <div class="subs">
-          {#each t.subs as s}
+          {#each t.subs as s, i}
             <label class="sub" class:on={s.done}>
               <input type="checkbox" checked={s.done} onchange={() => toggleSub(t, s)} />
               <span>{s.title}</span>
@@ -64,8 +65,24 @@
                   value={s.result ?? ''} onclick={(e) => e.preventDefault()}
                   onchange={(e) => setSubResult(t, s, e.currentTarget.value)} />
               {/if}
+              {#if kindOf(t) === 'rue'}
+                <button class="res" class:has={hasData(s)} title="Bilan du bloc"
+                  onclick={(e) => { e.preventDefault(); noting = noting === i ? -1 : i; }}>
+                  {hasData(s) ? blockSummary(s) || 'Noté' : 'Résultat'}
+                </button>
+              {/if}
               <button class="x" title="Retirer" aria-label="Retirer la sous-tâche" onclick={() => removeSub(t, s)}>×</button>
             </label>
+            {#if noting === i}
+              <div class="bilan">
+                {#each BLOCK_FIELDS as [key, label, isNum]}
+                  <label class:wide={!isNum}>{label}
+                    <input type={isNum ? 'number' : 'text'} min="0" value={s.data?.[key] ?? ''}
+                      onchange={(e) => setSubField(t, s, key, isNum, e.currentTarget.value)} />
+                  </label>
+                {/each}
+              </div>
+            {/if}
           {/each}
         </div>
       {/if}
@@ -143,6 +160,12 @@
   .sub { display: flex; align-items: center; gap: 9px; padding: 4px 0; }
   .sub input { width: 17px; height: 17px; accent-color: var(--ok); flex: none; }
   .sub span { flex: 1; }
+  .res { flex: none; font-size: 12px; font-weight: 700; padding: 1px 9px; border: 1px solid var(--line); border-radius: 99px; color: var(--sub); }
+  .res.has { color: var(--ink); }
+  .bilan { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 6px 0 10px 26px; }
+  .bilan label { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; font-weight: 700; color: var(--sub); }
+  .bilan label.wide { grid-column: span 5; }
+  .bilan input { width: 100%; }
   .sub input.score { width: 92px; height: auto; flex: none; padding: 2px 6px; font-size: 12.5px; }
   .sub.on span { color: var(--sub); text-decoration: line-through; }
   .x { color: var(--sub); font-size: 18px; padding: 0 6px; visibility: hidden; }

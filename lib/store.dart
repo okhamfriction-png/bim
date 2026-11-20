@@ -450,6 +450,14 @@ class Store extends ChangeNotifier {
   String unitsLabel(Task t) {
     final k = kinds[t.kindOf];
     if (k == null || t.subs.isEmpty) return '';
+    if (t.kindOf == 'rue') {
+      // Bilan des blocs notés : abonnés gagnés et places vendues.
+      final noted = t.subs.where((s) => s.data.isNotEmpty);
+      final ab = noted.fold(0, (a, s) => a + (s.gained ?? 0));
+      final oui = noted.fold(0, (a, s) => a + (s.count('oui') ?? 0));
+      return '${t.unitsDone}/${t.unitsTotal} ${k.$2}'
+          '${noted.isEmpty ? '' : ' · ${ab >= 0 ? '+' : ''}$ab ab. · $oui place${oui > 1 ? 's' : ''}'}';
+    }
     return t.whole
         ? '${t.subsDone}/${t.subs.length} prises${t.record > 0 ? ' · record ${t.record} s' : ''}'
         : '${t.unitsDone}/${t.unitsTotal} ${k.$2}';
@@ -605,6 +613,11 @@ class Store extends ChangeNotifier {
     s.done = !s.done;
     s.doneAt = s.done ? nowMs() : null;
     _settle(t);
+    touch(t);
+  }
+
+  void setSubData(Task t, Sub s, Map<String, dynamic> d) {
+    s.data = d;
     touch(t);
   }
 

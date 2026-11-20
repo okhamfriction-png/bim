@@ -119,6 +119,13 @@ export function pointsLabel(t) {
 export function unitsLabel(t) {
   const k = KINDS[kindOf(t)];
   if (!k || !subs(t).length) return '';
+  if (kindOf(t) === 'rue') {
+    const noted = subs(t).filter(hasData);
+    const ab = noted.reduce((a, s) => a + (gained(s) ?? 0), 0);
+    const oui = noted.reduce((a, s) => a + (s.data.oui ?? 0), 0);
+    return `${unitsDone(t)}/${unitsTotal(t)} ${k.unit}` +
+      (noted.length ? ` · ${ab >= 0 ? '+' : ''}${ab} ab. · ${oui} place${oui > 1 ? 's' : ''}` : '');
+  }
   return whole(t)
     ? `${subs(t).filter((s) => s.done).length}/${subs(t).length} prises${recordOf(t) ? ` · record ${recordOf(t)} s` : ''}`
     : `${unitsDone(t)}/${unitsTotal(t)} ${k.unit}`;
@@ -318,6 +325,38 @@ export function toggleSub(t, s) {
   if (s.done) s.doneAt = Date.now();
   else delete s.doneAt;
   settle(t);
+  touch(t);
+}
+/** Ce qu'on note à la fin d'un bloc de rue : [clé, libellé, nombre ?]. */
+export const BLOCK_FIELDS = [
+  ['approches', 'Approches (sur 20)', true],
+  ['avant', 'Abonnés avant', true],
+  ['apres', 'Abonnés après', true],
+  ['demandes', 'Demandes de place', true],
+  ['oui', 'Nombre de oui', true],
+  ['objection', 'Objection la plus entendue', false],
+  ['changer', 'Une chose à changer au bloc suivant', false],
+];
+const gained = (s) =>
+  s.data?.avant != null && s.data?.apres != null ? s.data.apres - s.data.avant : null;
+/** « 20/20 · +3 ab. · 1/4 places », vide si rien n'est noté. */
+export function blockSummary(s) {
+  const d = s.data ?? {};
+  const g = gained(s);
+  return [
+    d.approches != null ? `${d.approches}/20` : '',
+    g != null ? `${g >= 0 ? '+' : ''}${g} ab.` : '',
+    d.demandes != null || d.oui != null ? `${d.oui ?? 0}/${d.demandes ?? 0} places` : '',
+  ].filter(Boolean).join(' · ');
+}
+export const hasData = (s) => Object.keys(s.data ?? {}).length > 0;
+export function setSubField(t, s, key, isNum, v) {
+  const x = String(v ?? '').trim();
+  const d = { ...(s.data ?? {}) };
+  if (!x || (isNum && Number.isNaN(parseInt(x, 10)))) delete d[key];
+  else d[key] = isNum ? parseInt(x, 10) : x;
+  if (Object.keys(d).length) s.data = d;
+  else delete s.data;
   touch(t);
 }
 export function setSubResult(t, s, v) {

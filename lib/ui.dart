@@ -710,6 +710,9 @@ class SubCheck extends StatelessWidget {
         if (task.whole && sub.done && sub.result.isEmpty) {
           await askScore(context, task, sub);
           onChanged?.call();
+        } else if (task.kindOf == 'rue' && sub.done && sub.data.isEmpty) {
+          await askBlock(context, task, sub);
+          onChanged?.call();
         }
       },
       child: Padding(
@@ -728,7 +731,7 @@ class SubCheck extends StatelessWidget {
                       decoration: sub.done ? TextDecoration.lineThrough : null)),
             ),
           ),
-          if (task.whole) ScorePill(task, sub, onChanged: onChanged),
+          if (task.whole || task.kindOf == 'rue') ScorePill(task, sub, onChanged: onChanged),
         ]),
       ),
     );
@@ -1041,11 +1044,12 @@ class ScorePill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
-    final has = sub.result.isNotEmpty;
+    final rue = task.kindOf == 'rue';
+    final has = rue ? sub.data.isNotEmpty : sub.result.isNotEmpty;
     return InkWell(
       borderRadius: BorderRadius.circular(99),
       onTap: () async {
-        await askScore(context, task, sub);
+        await (rue ? askBlock(context, task, sub) : askScore(context, task, sub));
         onChanged?.call();
       },
       child: Container(
@@ -1053,10 +1057,62 @@ class ScorePill extends StatelessWidget {
         decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(99), border: Border.all(color: p.line)),
         child: Text(
-            has ? (int.tryParse(sub.result) != null ? '${sub.result} s' : sub.result) : 'Score',
+            rue
+                ? (has ? (sub.blockSummary.isEmpty ? 'Noté' : sub.blockSummary) : 'Résultat')
+                : has
+                    ? (int.tryParse(sub.result) != null ? '${sub.result} s' : sub.result)
+                    : 'Score',
             style: TextStyle(
                 fontSize: 12.5, fontWeight: FontWeight.w800, color: has ? p.ink : p.sub)),
       ),
     );
   }
+}
+
+/// Bilan d'un bloc de rue : des champs à remplir, les chiffres au clavier numérique.
+Future<void> askBlock(BuildContext context, Task t, Sub s) async {
+  final c = {
+    for (final f in blockFields) f.$1: TextEditingController(text: '${s.data[f.$1] ?? ''}')
+  };
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(s.title),
+      content: SingleChildScrollView(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          for (final f in blockFields)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: TextField(
+                controller: c[f.$1],
+                autofocus: f.$1 == blockFields.first.$1,
+                keyboardType: f.$3 ? TextInputType.number : TextInputType.text,
+                textCapitalization: TextCapitalization.sentences,
+                textInputAction: TextInputAction.next,
+                minLines: 1,
+                maxLines: f.$3 ? 1 : 3,
+                decoration: InputDecoration(labelText: f.$2, isDense: true),
+              ),
+            ),
+        ]),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Plus tard')),
+        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Noter')),
+      ],
+    ),
+  );
+  if (ok != true) return;
+  final d = <String, dynamic>{};
+  for (final f in blockFields) {
+    final v = c[f.$1]!.text.trim();
+    if (v.isEmpty) continue;
+    if (f.$3) {
+      final n = int.tryParse(v);
+      if (n != null) d[f.$1] = n;
+    } else {
+      d[f.$1] = v;
+    }
+  }
+  store.setSubData(t, s, d);
 }
