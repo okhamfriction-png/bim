@@ -76,18 +76,12 @@
             </label>
             {#if noting === i && whole(t)}
               <div class="bilan">
-                <label>Durée tenue (min)
-                  <input type="number" min="0" step="0.5" value={s.data?.duree ? Math.round(s.data.duree / 6) / 10 : ''}
+                <label>Secondes tenues
+                  <input type="number" min="0" value={s.data?.duree ?? ''}
                     onchange={(e) => setPrise(t, s, 'duree', e.currentTarget.value)} />
                 </label>
-                <label>Nombre de « euh »
-                  <input type="number" min="0" value={s.data?.euh ?? ''}
-                    onchange={(e) => setPrise(t, s, 'euh', e.currentTarget.value)} />
-                </label>
-                <label class="yes"><input type="checkbox" checked={s.data?.finie === true}
-                  onchange={(e) => setPrise(t, s, 'finie', e.currentTarget.checked)} /> Histoire terminée</label>
                 <label class="yes"><input type="checkbox" checked={s.data?.levierOk === true}
-                  onchange={(e) => setPrise(t, s, 'levierOk', e.currentTarget.checked)} /> Levier du jour réussi</label>
+                  onchange={(e) => setPrise(t, s, 'levierOk', e.currentTarget.checked)} /> Levier du jour joué</label>
               </div>
             {:else if noting === i}
               <div class="bilan">

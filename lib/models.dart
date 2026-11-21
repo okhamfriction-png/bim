@@ -64,19 +64,13 @@ class Sub {
 
   int? count(String k) => (data[k] as num?)?.toInt();
 
-  // ---- Prise d'échauffement : durée tenue (secondes), nombre de « euh », deux oui/non ----
+  // ---- Prise d'échauffement : secondes tenues avant le premier « euh », levier joué ou non ----
   int? get held => count('duree');
-  int? get euh => count('euh');
-  bool get noted => euh != null && (held ?? 0) > 0;
-
-  /// « Euh » par minute, si la prise est notée.
-  double? get rate => noted ? euh! * 60 / held! : null;
-  double get goal => (data['cible'] as num?)?.toDouble() ?? 3;
-  bool get finished => data['finie'] == true;
+  bool get noted => (held ?? 0) > 0;
   bool get leverOk => data['levierOk'] == true;
 
-  /// Prise réussie : cible tenue, histoire terminée, levier du jour réussi.
-  bool get success => noted && rate! <= goal && finished && leverOk;
+  /// Prise réussie : le levier du jour a été joué avant le premier « euh ».
+  bool get success => noted && leverOk;
 
   /// Abonnés gagnés pendant le bloc, si les deux compteurs sont notés.
   int? get gained => count('avant') != null && count('apres') != null ? count('apres')! - count('avant')! : null;
@@ -230,10 +224,10 @@ class Task {
   /// Unités à livrer : une par sous-tâche, sinon la tâche elle-même.
   bool get whole => wholeKinds.contains(kindOf);
 
-  /// Meilleure prise du sprint : le moins de « euh » par minute (null si rien n'est noté).
-  double? get bestRate {
-    final r = [for (final s in subs) if (s.noted && s.held! >= 60) s.rate!];
-    return r.isEmpty ? null : r.reduce(min);
+  /// Record du sprint : le plus de secondes tenues avant le premier « euh » (null si rien n'est noté).
+  int? get best {
+    final r = [for (final s in subs) if (s.noted) s.held!];
+    return r.isEmpty ? null : r.reduce(max);
   }
   int get successes => subs.where((s) => s.success).length;
   int get unitsTotal => subs.isEmpty || whole ? 1 : subs.length;

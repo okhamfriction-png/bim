@@ -2,9 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:vibration/vibration.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'defi_data.dart';
@@ -19,16 +17,14 @@ const _green = Color(0xFF22C55E);
 const _red = Color(0xFFEF4444);
 const _amber = Color(0xFFF59E0B);
 
-String fr(double v) => v.toStringAsFixed(1).replaceAll('.', ',');
+/// « 45 s », « 1 min 30 ».
+String secs(int s) => s < 60 ? '$s s' : (s % 60 == 0 ? '${s ~/ 60} min' : '${s ~/ 60} min ${(s % 60).toString().padLeft(2, '0')}');
 String mmss(int s) => '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
-String goalText(double g) => '${g == g.roundToDouble() ? g.round() : fr(g)} euh par minute ou moins';
 
-/// Compte les « euh » d'une transcription : euh, heu, hum, bah, ben, et « du coup » en début de phrase.
-int countEuh(String text) {
-  final t = text.toLowerCase();
-  final words = RegExp(r'(?<![a-zà-ÿ])(e+u+h+|h+e+u+|h+u+m+|h+m+|bah|ben)(?![a-zà-ÿ])').allMatches(t).length;
-  final duCoup = RegExp(r'(^|[.!?…\n]\s*|^\s*)du coup(?![a-zà-ÿ])', multiLine: true).allMatches(t).length;
-  return words + duCoup;
+double? median(Iterable<int> v) {
+  final l = v.toList()..sort();
+  if (l.isEmpty) return null;
+  return l.length.isOdd ? l[l.length ~/ 2].toDouble() : (l[l.length ~/ 2 - 1] + l[l.length ~/ 2]) / 2;
 }
 
 // ---- Niveaux, plan et adaptation ----
@@ -48,35 +44,69 @@ List<Task> warmups() => store.tasks.where((t) => !t.deleted && t.whole).toList()
 
 Task? taskOfLevel(int n) => warmups().where((t) => levelNo(t) == n).firstOrNull;
 
+/// Toutes les prises faites, dans l'ordre : la première est le « Jour 1 ».
+List<Sub> takes() => [
+      for (final t in warmups())
+        for (final s in t.subs)
+          if (s.done) s
+    ]..sort((a, b) => (a.doneAt ?? 0).compareTo(b.doneAt ?? 0));
+
+int dayNo(Sub s) => takes().indexOf(s) + 1;
+
+/// Une prise a déjà été faite aujourd'hui : une seule compte par sortie.
+bool takenToday() {
+  final d = ymd(DateTime.now());
+  return takes().any((s) => s.doneAt != null && ymd(DateTime.fromMillisecondsSinceEpoch(s.doneAt!)) == d);
+}
+
+int? levelBest(int n) {
+  final r = [for (final t in warmups()) if (levelNo(t) == n && t.best != null) t.best!];
+  return r.isEmpty ? null : r.reduce(max);
+}
+
+int? absBest() {
+  final r = [for (final t in warmups()) if (t.best != null) t.best!];
+  return r.isEmpty ? null : r.reduce(max);
+}
+
+double? taskMedian(Task? t) => median([for (final s in t?.subs ?? <Sub>[]) if (s.noted) s.held!]);
+
 bool _over(Task t) {
   final d = DateTime.tryParse(t.sprint ?? '');
   return d != null && !DateTime.now().isBefore(d.add(const Duration(days: 7)));
 }
 
-/// Trois prises d'affilée à plus de 3 « euh » par minute en moyenne.
-bool _threeBad(Task t) {
-  final r = [for (final s in t.subs) if (s.noted) s.rate!];
-  for (var i = 0; i + 3 <= r.length; i++) {
-    if ((r[i] + r[i + 1] + r[i + 2]) / 3 > 3) return true;
+/// Record visé pour un niveau. Dès qu'il y a des scores, il est recalé : le sprint qui suit la
+/// dernière prise vise le meilleur score arrondi au palier supérieur, puis un palier de plus par sprint.
+int? targetOf(int n) {
+  int? best;
+  var last = -1;
+  for (final t in warmups()) {
+    final l = levelNo(t);
+    if (l >= n || t.best == null) continue;
+    best = best == null ? t.best! : max(best, t.best!);
+    last = max(last, l);
   }
-  return false;
+  if (best == null) return stages[n].target;
+  var i = enduranceSteps.indexWhere((x) => x > best!);
+  if (i < 0) i = enduranceSteps.length - 1;
+  return enduranceSteps[min(enduranceSteps.length - 1, i + (n - last - 1))];
 }
 
 /// Ce qui est demandé pour un niveau, une fois l'adaptation appliquée.
 class Plan {
   final int n;
-  int minutes = 3;
-  double goal = 3;
   Map<String, int> steps = {}; // levier → palier en cours (chute, voix, émotion, personnages, images, corps)
   List<(String, int)> fresh = []; // leviers nouveaux de ce sprint
-  bool surprise = false, exam = false, deferred = false, dropped = false;
+  bool surprise = false, exam = false, deferred = false;
   String decision = 'Le sprint suit le plan.';
   Plan(this.n);
 
   Level get level => levels[n];
+  int? get target => targetOf(n);
   int stepOf(String lever) => switch (lever) {
-        'duree' => minutes >= 8 ? 3 : (minutes >= 5 ? 2 : 1),
-        'fluidite' => goal <= 1 ? 3 : (goal <= 2 ? 2 : 1),
+        'endurance' => enduranceSteps.where((x) => x <= (absBest() ?? 0)).length,
+        'silence' => 1,
         'structure' => n,
         _ => steps[lever] ?? 0,
       };
@@ -92,53 +122,44 @@ class Plan {
 Plan planOf(int n) {
   final p = Plan(n);
   var idx = 0;
-  var before = 3;
+  var added = false; // le sprint précédent a-t-il ajouté un levier ?
   for (var lv = 1; lv <= n; lv++) {
     final prev = taskOfLevel(lv - 1);
-    final failed = lv >= 2 && prev != null && _over(prev) && prev.successes < 4;
-    before = p.minutes;
+    final over = prev != null && _over(prev);
+    final failed = lv >= 2 && over && prev.successes < 4;
+    final m = taskMedian(prev), m0 = taskMedian(lv >= 2 ? taskOfLevel(lv - 2) : null);
+    final lower = lv >= 2 && over && added && m != null && m0 != null && m < m0;
     p.fresh = [];
     p.surprise = p.exam = false;
-    p.deferred = failed;
+    p.deferred = failed || lower;
     if (failed) {
       p.decision = 'Moins de 4 prises réussies au sprint précédent (${prev.successes} sur ${prev.subs.length}) : '
-          'le levier nouveau est reporté, la durée ne monte pas, tu retravailles le levier le plus faible.';
+          'le genre avance, le nouveau levier attend.';
+      added = false;
+    } else if (lower) {
+      p.decision = 'Ta médiane a baissé au sprint précédent après l\'ajout d\'un levier '
+          '(${secs(m.round())} contre ${secs(m0.round())}) : tu gardes ce levier un sprint de plus.';
+      added = false;
     } else {
       idx++;
       final st = stages[idx];
-      p.minutes = st.minutes;
-      p.goal = st.goal;
       p.fresh = st.fresh;
       p.surprise = st.surprise;
       p.exam = st.exam;
+      added = st.fresh.isNotEmpty;
       for (final f in st.fresh) {
         p.steps[f.$1] = max(p.steps[f.$1] ?? 0, f.$2);
       }
       p.decision = idx == lv
           ? 'Le sprint suit le plan.'
-          : 'Le plan a ${lv - idx} sprint${lv - idx > 1 ? 's' : ''} de retard : le levier nouveau est celui qui avait été reporté.';
+          : 'Le plan a ${lv - idx} sprint${lv - idx > 1 ? 's' : ''} de retard : le levier nouveau est celui qui attendait.';
     }
-    // Paliers avancés à la main après trois prises réussies d'affilée.
-    final boost = taskOfLevel(lv)?.meta['boost'];
-    if (boost is Map) {
-      boost.forEach((k, v) {
-        final lever = leverOf('$k');
-        p.steps[lever.id] = min(lever.steps.length, (p.steps[lever.id] ?? 0) + (v as num).toInt());
-      });
-    }
-  }
-  final t = taskOfLevel(n);
-  if (t != null && p.minutes > before && _threeBad(t)) {
-    p.minutes = before;
-    p.dropped = true;
-    p.decision = 'Plus de 3 « euh » par minute sur trois prises d\'affilée après la hausse de durée : '
-        'retour à $before minutes pour le reste du sprint.';
   }
   return p;
 }
 
 String unitName(String u) {
-  if (u == 'depart') return 'Démarrer et finir';
+  if (u == 'depart') return 'Démarrer sans préparation';
   if (u == 'surprise') return 'Contrainte surprise';
   if (u == 'examen') return 'Prise d\'examen';
   final x = u.split(':');
@@ -186,34 +207,7 @@ String leverOfDay(Plan p) {
   return best;
 }
 
-/// Meilleure prise sur un niveau : le moins de « euh » par minute.
-double? levelBest(int n) {
-  final r = [for (final t in warmups()) if (levelNo(t) == n && t.bestRate != null) t.bestRate!];
-  return r.isEmpty ? null : r.reduce(min);
-}
-
 bool starOf(Task t) => t.subs.isNotEmpty && t.successes >= min(4, t.subs.length);
-
-/// Proposition d'avancer d'un palier : trois prises d'affilée réussies à 1 « euh » par minute ou moins.
-String? boostOffer(Task t, Plan p) {
-  final noted = [for (final s in t.subs) if (s.noted) s];
-  if (noted.length < 3) return null;
-  if (!noted.sublist(noted.length - 3).every((s) => s.success && s.rate! <= 1)) return null;
-  final at = (t.meta['boostAt'] as num?)?.toInt();
-  if (at != null && noted.length - at < 3) return null;
-  final lever = p.fresh.isNotEmpty ? p.fresh.last.$1 : leverOfDay(p).split(':').first;
-  if (!levers.any((l) => l.id == lever)) return null;
-  if ((p.steps[lever] ?? 0) >= leverOf(lever).steps.length) return null;
-  return lever;
-}
-
-void acceptBoost(Task t, String lever) {
-  final b = Map<String, dynamic>.from(t.meta['boost'] as Map? ?? {});
-  b[lever] = ((b[lever] as num?)?.toInt() ?? 0) + 1;
-  t.meta['boost'] = b;
-  t.meta['boostAt'] = t.subs.where((s) => s.noted).length;
-  store.touch(t);
-}
 
 // ---- Fiche dans le détail de la tâche ----
 
@@ -228,12 +222,11 @@ class DefiCard extends StatelessWidget {
     final l = plan.level;
     final best = levelBest(l.n);
     final center = align == TextAlign.center;
-    final offer = boostOffer(task, plan);
     return Column(
         crossAxisAlignment: center ? CrossAxisAlignment.center : CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('NIVEAU ${l.n} · ${l.name.toUpperCase()} · ${plan.minutes} MIN',
+          Text('NIVEAU ${l.n} · ${l.name.toUpperCase()}',
               style: TextStyle(
                   fontSize: 12.5, fontWeight: FontWeight.w800, letterSpacing: .6, color: p.sub)),
           const SizedBox(height: 6),
@@ -246,28 +239,13 @@ class DefiCard extends StatelessWidget {
               runSpacing: 6,
               alignment: center ? WrapAlignment.center : WrapAlignment.start,
               children: [
-                Pill(goalText(plan.goal), _red, icon: Icons.flag_rounded),
-                Pill(best != null ? 'Record : ${fr(best)} euh/min' : 'Pas encore de record', _amber,
+                const Pill('Stop au premier « euh »', _red, icon: Icons.block_rounded),
+                Pill(best != null ? 'Record : ${secs(best)}' : 'Pas encore de record', _amber,
                     icon: Icons.emoji_events_rounded),
+                if (plan.target != null) Pill('Visé : ${secs(plan.target!)}', _amber, icon: Icons.flag_rounded),
                 Pill('${task.successes}/${task.subs.length} réussies${starOf(task) ? ' ★' : ''}', _green,
                     icon: Icons.videocam_rounded),
               ]),
-          if (offer != null)
-            Container(
-              margin: const EdgeInsets.only(top: 12),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                  color: _green.withValues(alpha: .12), borderRadius: BorderRadius.circular(14)),
-              child: Row(children: [
-                Expanded(
-                  child: Text(
-                      'Trois prises réussies d\'affilée à 1 euh/min ou moins. '
-                      'Avancer d\'un palier en ${leverOf(offer).name} ?',
-                      style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600)),
-                ),
-                TextButton(onPressed: () => acceptBoost(task, offer), child: const Text('Avancer')),
-              ]),
-            ),
           const SizedBox(height: 14),
           Wrap(
               spacing: 8,
@@ -309,15 +287,16 @@ class _DefiPageState extends State<DefiPage> {
   String phase = 'ready'; // ready | run | done
   DateTime? start, ended;
   Timer? tick;
-  int held = 0;
-  bool half = false, last = false, swapped = false;
+  int score = 0;
+  bool swapped = false;
   Sub? saved;
+  int? before, beforeAll; // records avant cette prise
   late final Plan plan = planOf(levelNo(widget.task));
   late final String unit = leverOfDay(plan);
   late final String surprise = surprises[Random().nextInt(surprises.length)];
+  late final bool extra = takenToday() || widget.task.nextSub == null; // prise hors compte
   late String subject = _draw();
 
-  int get total => plan.minutes * 60;
   int get elapsed => start == null ? 0 : DateTime.now().difference(start!).inSeconds;
   int get approachLeft =>
       ended == null ? approachSeconds : approachSeconds - DateTime.now().difference(ended!).inSeconds;
@@ -340,13 +319,6 @@ class _DefiPageState extends State<DefiPage> {
     super.dispose();
   }
 
-  Future<void> buzz(int ms) async {
-    try {
-      HapticFeedback.heavyImpact();
-      await Vibration.vibrate(duration: ms);
-    } catch (_) {}
-  }
-
   void go() {
     WakelockPlus.enable().catchError((_) {});
     setState(() {
@@ -354,45 +326,29 @@ class _DefiPageState extends State<DefiPage> {
       start = DateTime.now();
     });
     tick?.cancel();
-    tick = Timer.periodic(const Duration(milliseconds: 250), (_) {
-      if (phase == 'run') {
-        final e = elapsed;
-        if (!half && e >= total ~/ 2) {
-          half = true;
-          buzz(500);
-        }
-        if (!last && e >= total - 30) {
-          last = true;
-          buzz(900);
-        }
-        if (e >= total) {
-          buzz(1200);
-          finish(total);
-          return;
-        }
-      }
-      setState(() {});
-    });
+    tick = Timer.periodic(const Duration(milliseconds: 250), (_) => setState(() {}));
   }
 
-  void finish(int s) {
+  /// Le « euh » est tombé : le score est figé et noté dans la prise du jour.
+  void stop() {
+    final s = max(1, elapsed);
+    before = levelBest(plan.n);
+    beforeAll = absBest();
     final t = widget.task;
-    final sub = t.nextSub;
+    final sub = extra ? null : t.nextSub;
     if (sub != null) {
       sub.data = {
         ...sub.data,
         'duree': s,
         'levier': unit,
         if (unit == 'surprise') 'ligne': surprise,
-        'cible': plan.goal,
-        'min': plan.minutes,
         if (subjects[plan.n] != null) 'sujet': subject,
       };
       store.toggleSub(t, sub);
     }
     setState(() {
       phase = 'done';
-      held = s;
+      score = s;
       saved = sub;
       ended = DateTime.now();
     });
@@ -416,7 +372,10 @@ class _DefiPageState extends State<DefiPage> {
                       onPressed: () => Navigator.pop(context),
                       icon: const Icon(Icons.close_rounded)),
                   const Spacer(),
-                  Text('${t.subsDone}/${t.subs.length} prises',
+                  Text(
+                      extra && saved == null
+                          ? '${t.subsDone}/${t.subs.length} prises'
+                          : 'Jour ${saved != null ? dayNo(saved!) : takes().length + 1} · ${t.subsDone}/${t.subs.length} prises',
                       style: TextStyle(color: p.sub, fontWeight: FontWeight.w700)),
                   const SizedBox(width: 10),
                 ]),
@@ -437,13 +396,13 @@ class _DefiPageState extends State<DefiPage> {
 
   Widget _ready(Pal p) {
     final l = plan.level;
-    final best = levelBest(l.n);
+    final best = levelBest(l.n), all = absBest();
     final pool = subjects[plan.n] != null;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Expanded(
         child: SingleChildScrollView(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Niveau ${l.n} · ${l.name} · ${plan.minutes} min',
+            Text('Niveau ${l.n} · ${l.name}',
                 style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: p.accent)),
             const SizedBox(height: 12),
             Text(l.defi,
@@ -466,18 +425,22 @@ class _DefiPageState extends State<DefiPage> {
             _box(p, 'LE LEVIER DU JOUR', leverLine, accent: p.accent),
             const SizedBox(height: 10),
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Expanded(child: _box(p, 'LA CIBLE', goalText(plan.goal))),
+              Expanded(child: _box(p, 'RECORD DU NIVEAU', best != null ? secs(best) : '—')),
               const SizedBox(width: 10),
-              Expanded(child: _box(p, 'MON RECORD', best != null ? '${fr(best)} euh/min' : '—')),
+              Expanded(child: _box(p, 'RECORD ABSOLU', all != null ? secs(all) : '—')),
             ]),
           ]),
         ),
       ),
-      if (widget.task.nextSub == null)
+      if (extra)
         Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: Text('Toutes les prises du sprint sont faites : celle-ci ne sera pas enregistrée.',
-              textAlign: TextAlign.center, style: TextStyle(color: p.sub)),
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Text(
+              widget.task.nextSub == null
+                  ? 'Toutes les prises du sprint sont faites : celle-ci ne comptera pas.'
+                  : 'Ta prise du jour est déjà faite : celle-ci ne comptera pas.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: p.sub)),
         ),
       const SizedBox(height: 10),
       FilledButton(
@@ -490,68 +453,72 @@ class _DefiPageState extends State<DefiPage> {
     ]);
   }
 
-  Widget _run(Pal p) {
-    final left = (total - elapsed).clamp(0, total);
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const SizedBox(height: 10),
-      _box(p, 'SUJET', subject),
-      const SizedBox(height: 10),
-      _box(p, 'LEVIER DU JOUR', leverLine, accent: p.accent),
-      const Spacer(),
-      Text(mmss(left),
-          textAlign: TextAlign.center,
-          style: TextStyle(
-              fontSize: 44,
-              fontWeight: FontWeight.w800,
-              color: p.sub,
-              fontFeatures: const [FontFeature.tabularFigures()])),
-      const SizedBox(height: 10),
-      ClipRRect(
-        borderRadius: BorderRadius.circular(99),
-        child: LinearProgressIndicator(
-            value: 1 - left / total, minHeight: 6, backgroundColor: p.line, color: p.accent),
-      ),
-      const SizedBox(height: 8),
-      Text('Vibration à mi-temps, puis à 30 secondes de la fin.',
-          textAlign: TextAlign.center, style: TextStyle(color: p.sub, fontSize: 13.5)),
-      const Spacer(),
-      OutlinedButton(
-        onPressed: () => finish(elapsed),
-        style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 20),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
-        child: const Text('Terminer la prise',
-            style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
-      ),
-    ]);
-  }
+  Widget _run(Pal p) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const SizedBox(height: 6),
+        _box(p, 'LEVIER DU JOUR', leverLine, accent: p.accent),
+        const Spacer(),
+        Text(mmss(elapsed),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+                fontSize: 110,
+                height: 1,
+                fontWeight: FontWeight.w900,
+                fontFeatures: [FontFeature.tabularFigures()])),
+        Text('sans « euh » · un silence ne compte pas',
+            textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: p.sub)),
+        const Spacer(),
+        SizedBox(
+          height: 200,
+          child: FilledButton(
+            onPressed: stop,
+            style: FilledButton.styleFrom(
+                backgroundColor: _red,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28))),
+            child: const Text('Euh', style: TextStyle(fontSize: 60, fontWeight: FontWeight.w900)),
+          ),
+        ),
+      ]);
 
   Widget _done(Pal p) {
     final left = approachLeft;
+    final beaten = before == null || score > before!;
+    final all = beforeAll != null && score > beforeAll!;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       const Spacer(),
-      Text('Prise terminée', textAlign: TextAlign.center, style: TextStyle(fontSize: 17, color: p.sub)),
-      Text(mmss(held),
+      Text(secs(score),
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 72, height: 1.1, fontWeight: FontWeight.w900)),
-      const SizedBox(height: 10),
+          style: const TextStyle(fontSize: 84, height: 1, fontWeight: FontWeight.w900)),
+      const SizedBox(height: 8),
+      Text(
+          before == null
+              ? 'Premier score sur ce niveau : c\'est ton record.'
+              : all
+                  ? 'Record absolu battu (+${secs(score - beforeAll!)})'
+                  : beaten
+                      ? 'Record du niveau battu (+${secs(score - before!)})'
+                      : score == before
+                          ? 'Record égalé'
+                          : '${secs(before! - score)} sous ton record (${secs(before!)})',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: beaten ? _green : p.sub)),
+      const SizedBox(height: 12),
       Text('Finis par : « $defiOutro »',
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-      const SizedBox(height: 10),
+          textAlign: TextAlign.center, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+      const SizedBox(height: 8),
       Text(
           saved == null
-              ? 'Prise libre, non enregistrée.'
-              : 'Tu noteras tes 4 résultats après le bloc de rue.',
+              ? 'Prise hors compte, non enregistrée.'
+              : 'Après le bloc : confirme les secondes et dis si le levier a été joué.',
           textAlign: TextAlign.center,
           style: TextStyle(color: p.sub, fontSize: 15)),
       if (saved != null)
         TextButton(
             onPressed: () async {
               await askPrise(context, widget.task, saved!);
-              if (mounted) setState(() {});
+              if (mounted) setState(() => score = saved!.held ?? score);
             },
-            child: Text(saved!.noted ? 'Corriger les résultats' : 'Noter maintenant')),
+            child: const Text('Noter maintenant')),
       const Spacer(),
       Container(
         padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
@@ -602,29 +569,26 @@ class _DefiPageState extends State<DefiPage> {
       );
 }
 
-// ---- Les 4 résultats d'une prise ----
+// ---- Les 2 résultats d'une prise ----
 
-int? _parseTime(String v) {
-  final s = v.trim().replaceAll(',', '.');
+int? _parseSecs(String v) {
+  final s = v.trim();
   if (s.isEmpty) return null;
   if (s.contains(':')) {
     final x = s.split(':');
     final m = int.tryParse(x[0]), sec = int.tryParse(x[1].isEmpty ? '0' : x[1]);
     return m == null || sec == null ? null : m * 60 + sec;
   }
-  final m = double.tryParse(s);
-  return m == null ? null : (m * 60).round();
+  return int.tryParse(s);
 }
 
-/// Après le bloc de rue : durée tenue, nombre de « euh », histoire terminée, levier réussi.
+/// Après le bloc de rue : secondes tenues avant le premier « euh », levier du jour joué ou non.
 Future<void> askPrise(BuildContext context, Task t, Sub s) async {
   final plan = planOf(levelNo(t));
   final unit = (s.data['levier'] as String?) ?? leverOfDay(plan);
   final line = (s.data['ligne'] as String?) ?? unitLine(unit);
-  final dur = TextEditingController(text: s.held != null ? mmss(s.held!) : '${plan.minutes}:00');
-  final euh = TextEditingController(text: s.euh?.toString() ?? '');
-  final text = TextEditingController();
-  var finie = s.finished, ok = s.leverOk;
+  final dur = TextEditingController(text: s.held?.toString() ?? '');
+  var ok = s.leverOk;
   final saved = await showDialog<bool>(
     context: context,
     builder: (ctx) => StatefulBuilder(
@@ -632,48 +596,19 @@ Future<void> askPrise(BuildContext context, Task t, Sub s) async {
         title: Text(s.title),
         content: SingleChildScrollView(
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Expanded(
-                child: TextField(
-                  controller: dur,
-                  keyboardType: TextInputType.datetime,
-                  decoration: const InputDecoration(labelText: 'Durée tenue', hintText: '3:00', isDense: true),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  controller: euh,
-                  autofocus: true,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Nombre de « euh »', isDense: true),
-                ),
-              ),
-            ]),
+            TextField(
+              controller: dur,
+              autofocus: s.held == null,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                  labelText: 'Secondes tenues avant le premier « euh »', suffixText: 's', isDense: true),
+            ),
             SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Histoire terminée'),
-                value: finie,
-                onChanged: (v) => set(() => finie = v)),
-            SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Levier du jour réussi'),
+                title: const Text('Levier du jour joué'),
                 subtitle: Text(line),
                 value: ok,
                 onChanged: (v) => set(() => ok = v)),
-            const SizedBox(height: 6),
-            TextField(
-              controller: text,
-              minLines: 1,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                  labelText: 'Transcription (facultatif)',
-                  hintText: 'Colle le texte : les « euh » sont comptés pour toi',
-                  isDense: true),
-              onChanged: (v) {
-                if (v.trim().isNotEmpty) set(() => euh.text = '${countEuh(v)}');
-              },
-            ),
           ]),
         ),
         actions: [
@@ -684,23 +619,19 @@ Future<void> askPrise(BuildContext context, Task t, Sub s) async {
     ),
   );
   if (saved != true) return;
-  final d = _parseTime(dur.text);
-  final n = int.tryParse(euh.text.trim());
+  final d = _parseSecs(dur.text);
   if (!s.done) store.toggleSub(t, s);
   store.setSubData(t, s, {
     ...s.data,
     if (d != null && d > 0) 'duree': d,
-    if (n != null) 'euh': n,
-    'finie': finie,
     'levierOk': ok,
     'levier': unit,
-    'cible': s.data['cible'] ?? plan.goal,
-    'min': s.data['min'] ?? plan.minutes,
   });
 }
 
-/// Résumé d'une prise notée : « 1,7 euh/min ✓ ».
-String priseSummary(Sub s) => s.noted ? '${fr(s.rate!)} euh/min ${s.success ? '✓' : '✗'}' : 'Résultat';
+/// Résumé d'une prise : « Jour 2 · 41 s ✓ ».
+String priseSummary(Sub s) =>
+    s.noted ? '${s.done ? 'Jour ${dayNo(s)} · ' : ''}${secs(s.held!)} ${s.success ? '✓' : '✗'}' : 'Résultat';
 
 // ---- Pourquoi ce niveau ? ----
 
@@ -726,7 +657,7 @@ class WhySheet extends StatelessWidget {
         );
     final active = [
       for (final lv in levers)
-        if (plan.stepOf(lv.id) > 0) lv
+        if (plan.stepOf(lv.id) > 0 || lv.id == 'endurance') lv
     ];
     final topics = <String>[];
     for (final s in sources) {
@@ -739,8 +670,8 @@ class WhySheet extends StatelessWidget {
         Text('Phase : ${phases[l.n]}', style: TextStyle(color: p.sub, fontSize: 14.5)),
       h('CE SPRINT'),
       line('Genre', '${l.name} (${l.skill.toLowerCase()})'),
-      line('Durée cible', '${plan.minutes} minutes, à la caméra, une prise par sortie'),
-      line('Cible', goalText(plan.goal)),
+      line('Règle', 'à la caméra, une prise par sortie ; elle s\'arrête au premier « euh » et le score est le nombre de secondes tenues'),
+      line('Record visé', plan.target == null ? 'aucun : ton premier score sert de point de départ' : secs(plan.target!)),
       line('Levier nouveau',
           plan.fresh.isEmpty ? 'aucun' : plan.fresh.map((f) => '${leverOf(f.$1).name} palier ${f.$2}').join(', ')),
       line('Levier du jour', day == 'surprise' ? 'une contrainte surprise tirée au hasard' : unitLine(day)),
@@ -765,8 +696,7 @@ class WhySheet extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: 4),
           child: Text(
               s.noted
-                  ? '${s.title} : ${mmss(s.held!)} tenues, ${s.euh} euh (${fr(s.rate!)}/min), '
-                      'histoire ${s.finished ? 'terminée' : 'non terminée'}, levier ${s.leverOk ? 'réussi' : 'raté'}'
+                  ? '${s.title} (jour ${dayNo(s)}) : ${secs(s.held!)} tenues, levier ${s.leverOk ? 'joué' : 'non joué'}'
                       '${s.success ? ' · réussie' : ''}'
                   : '${s.title} : ${s.done ? 'faite, pas encore notée' : 'à faire'}',
               style: const TextStyle(fontSize: 14.5, height: 1.35)),
@@ -813,14 +743,11 @@ class ProgressionPage extends StatelessWidget {
               listenable: store,
               builder: (context, _) {
                 final all = warmups();
-                final takes = [
-                  for (final t in all)
-                    for (final s in t.subs)
-                      if (s.noted) s
-                ]..sort((a, b) => (a.doneAt ?? 0).compareTo(b.doneAt ?? 0));
+                final noted = [for (final s in takes()) if (s.noted) s];
                 final now = ymd(Schedule.mondayOf(DateTime.now()));
                 final cur = all.where((t) => (t.sprint ?? '').compareTo(now) <= 0).lastOrNull;
                 final plan = planOf(cur == null ? 0 : levelNo(cur));
+                final best = absBest();
                 Widget h(String s) => Padding(
                       padding: const EdgeInsets.only(top: 24, bottom: 8),
                       child: Text(s,
@@ -833,10 +760,18 @@ class ProgressionPage extends StatelessWidget {
                         style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
                   ]),
                   Text(defiGoal, style: TextStyle(color: p.sub, fontSize: 14.5, height: 1.35)),
-                  h('« EUH » PAR MINUTE'),
-                  _Chart([for (final s in takes) s.rate!], target: 1, color: _red, unit: ''),
-                  h('DURÉE TENUE (MINUTES)'),
-                  _Chart([for (final s in takes) s.held! / 60], target: 8, color: p.accent, unit: ''),
+                  h('MON RECORD'),
+                  Text(best == null ? '—' : secs(best),
+                      style: const TextStyle(fontSize: 54, height: 1, fontWeight: FontWeight.w900)),
+                  if (plan.target != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text('Record visé ce sprint : ${secs(plan.target!)}',
+                          style: TextStyle(color: p.sub, fontSize: 15)),
+                    ),
+                  h('SECONDES TENUES, JOUR APRÈS JOUR'),
+                  _Chart([for (final s in noted) s.held!.toDouble()],
+                      target: (plan.target ?? 30).toDouble(), color: p.accent, unit: ''),
                   h('LES 9 LEVIERS'),
                   for (final lv in levers)
                     Padding(
@@ -871,8 +806,8 @@ class ProgressionPage extends StatelessWidget {
                   for (final l in levels)
                     Builder(builder: (context) {
                       final t = taskOfLevel(l.n);
-                      final r = [for (final s in t?.subs ?? <Sub>[]) if (s.noted) s.rate!];
-                      final best = levelBest(l.n);
+                      final r = [for (final s in t?.subs ?? <Sub>[]) if (s.noted) s.held!];
+                      final target = targetOf(l.n);
                       return Container(
                         padding: const EdgeInsets.symmetric(vertical: 9),
                         decoration:
@@ -888,9 +823,10 @@ class ProgressionPage extends StatelessWidget {
                                   style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800)),
                               Text(
                                   r.isEmpty
-                                      ? '${stages[l.n].minutes} min · pas encore de prise notée'
-                                      : 'record ${fr(best ?? r.reduce(min))} · moyenne ${fr(r.reduce((a, b) => a + b) / r.length)} euh/min · '
-                                          '${r.length} prise${r.length > 1 ? 's' : ''} · ${t!.successes} réussie${t.successes > 1 ? 's' : ''}',
+                                      ? (target == null ? 'pas encore de prise notée' : 'record visé : ${secs(target)}')
+                                      : 'record ${secs(r.reduce(max))} · médiane ${secs(median(r)!.round())} · '
+                                          '${r.length} prise${r.length > 1 ? 's' : ''} · ${t!.successes} réussie${t.successes > 1 ? 's' : ''}'
+                                          '${target == null ? '' : ' · visé ${secs(target)}'}',
                                   style: TextStyle(fontSize: 13, color: p.sub)),
                             ]),
                           ),
@@ -943,7 +879,7 @@ class _Line extends CustomPainter {
   _Line(this.v, this.target, this.color, this.p);
   @override
   void paint(Canvas c, Size s) {
-    const left = 26.0;
+    const left = 44.0;
     final top = max(v.reduce(max), target) * 1.15;
     double y(double x) => s.height - (x / top) * s.height;
     double x(int i) => v.length == 1 ? (left + s.width) / 2 : left + i * (s.width - left) / (v.length - 1);
@@ -965,8 +901,8 @@ class _Line extends CustomPainter {
     for (var xx = left; xx < s.width; xx += 10) {
       c.drawLine(Offset(xx, y(target)), Offset(min(xx + 5, s.width), y(target)), dash);
     }
-    label(fr(target), y(target));
-    label(fr(top), 6);
+    label(secs(target.round()), y(target));
+    label(secs(top.round()), 6);
     final line = Paint()
       ..color = color
       ..strokeWidth = 2.5
@@ -998,12 +934,7 @@ class DefiReview extends StatelessWidget {
     final i = all.lastIndexWhere((t) => (t.sprint ?? '').compareTo(now) <= 0);
     if (i < 0) return const SizedBox.shrink();
     final t = all[i];
-    double? mean(Task? x) {
-      final r = [for (final s in x?.subs ?? <Sub>[]) if (s.noted) s.rate!];
-      return r.isEmpty ? null : r.reduce((a, b) => a + b) / r.length;
-    }
-
-    final m = mean(t), before = mean(i > 0 ? all[i - 1] : null);
+    final m = taskMedian(t), before = taskMedian(i > 0 ? all[i - 1] : null);
     final plan = planOf(levelNo(t));
     final units = {
       for (final s in t.subs)
@@ -1022,14 +953,21 @@ class DefiReview extends StatelessWidget {
     // La décision du sprint suivant, comme si celui-ci était terminé.
     String decision() {
       if (next == null) return 'Dernier sprint du plan.';
+      final aim = t.best == null
+          ? targetOf(next)
+          : enduranceSteps.firstWhere((x) => x > (absBest() ?? 0), orElse: () => enduranceSteps.last);
+      final goal = aim == null ? '' : ' Record visé : ${secs(aim)}${t.best == null ? '' : ', ton meilleur score arrondi au palier supérieur'}.';
       if (levelNo(t) >= 1 && t.successes < 4) {
-        return 'Le genre avance (${levels[next].name}), mais le levier nouveau est reporté et la durée ne monte pas : '
-            '${t.successes} prise${t.successes > 1 ? 's' : ''} réussie${t.successes > 1 ? 's' : ''} sur ${t.subs.length}, il en faut 4.';
+        return 'Le genre avance (${levels[next].name}), mais le nouveau levier attend : '
+            '${t.successes} prise${t.successes > 1 ? 's' : ''} réussie${t.successes > 1 ? 's' : ''} sur ${t.subs.length}, il en faut 4.$goal';
+      }
+      if (levelNo(t) >= 1 && plan.fresh.isNotEmpty && m != null && before != null && m < before) {
+        return 'Le genre avance (${levels[next].name}), mais tu gardes le levier de ce sprint un sprint de plus : '
+            'ta médiane a baissé après son ajout.$goal';
       }
       final st = stages[min(next, stages.length - 1)];
-      return 'Le sprint suivant suit le plan : ${levels[next].name}, ${st.minutes} min'
-          '${st.fresh.isEmpty ? '' : ', levier nouveau ${st.fresh.map((f) => '${leverOf(f.$1).name} palier ${f.$2}').join(' et ')}'}, '
-          'parce que ${levelNo(t) == 0 ? 'le sprint « Fiction time » sert de mise en route' : 'au moins 4 prises sont réussies'}.';
+      return 'Le sprint suivant suit le plan : ${levels[next].name}'
+          '${st.fresh.isEmpty ? '' : ', levier nouveau ${st.fresh.map((f) => '${leverOf(f.$1).name} palier ${f.$2}').join(' et ')}'}.$goal';
     }
 
     Widget row(String a, String b) => Padding(
@@ -1041,18 +979,19 @@ class DefiReview extends StatelessWidget {
           ]),
         );
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      row('Niveau', '${plan.level.n} · ${plan.level.name} · ${plan.minutes} min${starOf(t) ? ' ★' : ''}'),
-      row(
-          'Euh par minute',
-          m == null
-              ? 'aucune prise notée'
-              : '${fr(m)} en moyenne'
-                  '${before == null ? '' : (m < before ? ' (${fr(before - m)} de moins qu\'au sprint précédent)' : m > before ? ' (${fr(m - before)} de plus qu\'au sprint précédent)' : ' (stable)')}'),
+      row('Niveau', '${plan.level.n} · ${plan.level.name}${starOf(t) ? ' ★' : ''}'),
+      row('Record du sprint',
+          t.best == null ? 'aucune prise notée' : '${secs(t.best!)}${plan.target == null ? '' : ' (visé : ${secs(plan.target!)})'}'),
+      if (m != null)
+        row(
+            'Médiane',
+            '${secs(m.round())}'
+                '${before == null ? '' : (m > before ? ' (+${secs((m - before).round())} sur le sprint précédent)' : m < before ? ' (−${secs((before - m).round())} sur le sprint précédent)' : ' (stable)')}'),
       row('Prises réussies', '${t.successes} sur ${t.subs.length}'),
       for (final u in units)
         row(unitName(u), () {
           final (ok, n) = unitStats(u, only: t);
-          return '$ok réussite${ok > 1 ? 's' : ''} sur $n';
+          return 'joué $ok fois sur $n';
         }()),
       if (weak != null) row('Levier le plus faible', unitName(weak)),
       row('Sprint suivant', decision()),

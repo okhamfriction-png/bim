@@ -95,29 +95,23 @@ export function kindOf(t) {
 export const iconOf = (t) => (t.call ? '📞' : KINDS[kindOf(t)]?.icon ?? CAT_ICON[catOf(t)]);
 const subs = (t) => t.subs ?? [];
 export const whole = (t) => WHOLE.has(kindOf(t));
-// ---- Prise d'échauffement : durée tenue (secondes), nombre de « euh », deux oui/non ----
-export const noted = (s) => s.data?.euh != null && (s.data?.duree ?? 0) > 0;
-export const rateOf = (s) => (noted(s) ? (s.data.euh * 60) / s.data.duree : null);
-export const priseOk = (s) =>
-  noted(s) && rateOf(s) <= (s.data.cible ?? 3) && s.data.finie === true && s.data.levierOk === true;
-const fr1 = (v) => v.toFixed(1).replace('.', ',');
-export const priseSummary = (s) => (noted(s) ? `${fr1(rateOf(s))} euh/min ${priseOk(s) ? '✓' : '✗'}` : 'Résultat');
-/** Meilleure prise du sprint : le moins de « euh » par minute. */
+// ---- Prise d'échauffement : secondes tenues avant le premier « euh », levier joué ou non ----
+export const noted = (s) => (s.data?.duree ?? 0) > 0;
+export const priseOk = (s) => noted(s) && s.data.levierOk === true;
+const secs = (n) => (n < 60 ? `${n} s` : n % 60 === 0 ? `${n / 60} min` : `${Math.floor(n / 60)} min ${String(n % 60).padStart(2, '0')}`);
+export const priseSummary = (s) => (noted(s) ? `${secs(s.data.duree)} ${priseOk(s) ? '✓' : '✗'}` : 'Résultat');
+/** Record du sprint : le plus de secondes tenues. */
 export const recordOf = (t) => {
-  const r = subs(t).filter((s) => noted(s) && s.data.duree >= 60).map(rateOf);
-  return r.length ? Math.min(...r) : null;
+  const r = subs(t).filter(noted).map((s) => s.data.duree);
+  return r.length ? Math.max(...r) : null;
 };
-/** Note un des 4 résultats d'une prise ; la cible et le levier du sprint sont repris de la tâche. */
+/** Note un des 2 résultats d'une prise ; le levier du sprint est repris de la tâche. */
 export function setPrise(t, s, key, v) {
-  const d = { cible: t.meta?.cible ?? 3, levier: t.meta?.nouveau?.at(-1) ?? 'depart', ...(s.data ?? {}) };
+  const d = { levier: t.meta?.nouveau?.at(-1) ?? 'depart', ...(s.data ?? {}) };
   if (key === 'duree') {
-    const m = parseFloat(String(v).replace(',', '.'));
-    if (Number.isNaN(m) || m <= 0) delete d.duree;
-    else d.duree = Math.round(m * 60);
-  } else if (key === 'euh') {
     const n = parseInt(v, 10);
-    if (Number.isNaN(n)) delete d.euh;
-    else d.euh = n;
+    if (Number.isNaN(n) || n <= 0) delete d.duree;
+    else d.duree = n;
   } else d[key] = !!v;
   s.data = d;
   touch(t);
@@ -155,7 +149,7 @@ export function unitsLabel(t) {
       (noted.length ? ` · ${ab >= 0 ? '+' : ''}${ab} ab. · ${oui} place${oui > 1 ? 's' : ''}` : '');
   }
   return whole(t)
-    ? `${subs(t).filter((s) => s.done).length}/${subs(t).length} prises${recordOf(t) != null ? ` · ${fr1(recordOf(t))} euh/min` : ''}`
+    ? `${subs(t).filter((s) => s.done).length}/${subs(t).length} prises${recordOf(t) != null ? ` · record ${secs(recordOf(t))}` : ''}`
     : `${unitsDone(t)}/${unitsTotal(t)} ${k.unit}`;
 }
 /** Points d'un groupe de tâches : « 3/13 pts » dès qu'il y en a de gagnés, sinon « 13 pts ». */

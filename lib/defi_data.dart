@@ -10,8 +10,10 @@ class Level {
 const defiOutro = 'Allez là où l\'IA ne va pas.';
 const approachSeconds = 300;
 const defiGoal =
-    'But au 14 février : 8 minutes d\'histoire improvisée, 1 « euh » par minute ou moins, '
-    'trois émotions jouées, deux personnages distincts et une vraie chute.';
+    'But au 14 février : 5 minutes sans un seul « euh », avec trois émotions, deux personnages et une chute.';
+
+/// Paliers d'endurance : secondes tenues avant le premier « euh ».
+const enduranceSteps = [30, 45, 60, 90, 120, 150, 180, 210, 240, 270, 300];
 
 const levels = <Level>[
   Level(0, 'Fiction time',
@@ -57,22 +59,24 @@ class Lever {
 }
 
 const levers = <Lever>[
-  Lever('duree', 'Durée', ['Tiens 3 minutes.', 'Tiens 5 minutes.', 'Tiens 8 minutes.'],
+  Lever('endurance', 'Endurance', [
+    'Tiens 30 secondes.', 'Tiens 45 secondes.', 'Tiens 1 minute.', 'Tiens 1 min 30.', 'Tiens 2 minutes.',
+    'Tiens 2 min 30.', 'Tiens 3 minutes.', 'Tiens 3 min 30.', 'Tiens 4 minutes.', 'Tiens 4 min 30.',
+    'Tiens 5 minutes.',
+  ],
       origin:
           'Pratique délibérée (Ericsson, Krampe et Tesch-Römer, 1993) : la même tâche répétée, un peu plus difficile à chaque palier.',
       gain:
           'Dans la rue, tenir une conversation sans chercher la sortie. Sur scène, tenir une scène longue sans s\'essouffler.',
-      test: 'Tu parles jusqu\'au bout du chrono, sans arrêt de plus de quelques secondes.',
-      trap: 'Remplir pour tenir : répéter la même idée au lieu de faire avancer l\'histoire.'),
-  Lever('fluidite', 'Fluidité',
-      ['3 « euh » par minute ou moins.', '2 « euh » par minute ou moins.', '1 « euh » par minute ou moins.'],
+      test: 'Ton record, en secondes tenues avant le premier « euh », atteint le palier.',
+      trap: 'Remplir pour durer : répéter la même idée au lieu de faire avancer l\'histoire.'),
+  Lever('silence', 'Silence', ['Tais-toi 2 secondes au lieu de dire « euh ».'],
       origin:
-          'Noah Zandan (2018) : une pause à la place du mot de remplissage, un par minute comme idéal ; recherches sur les hésitations à l\'oral.',
+          'Noah Zandan (2018) : une pause à la place du mot de remplissage ; recherches sur les hésitations à l\'oral.',
       gain:
           'Dans la rue, une phrase nette inspire confiance dès la première seconde. Sur scène, le silence devient un outil de jeu.',
-      test:
-          'On compte euh, heu, hum, bah, ben et « du coup » en début de phrase, divisés par les minutes tenues. Un silence ne compte pas.',
-      trap: 'Accélérer pour ne pas hésiter : ralentis et tais-toi une seconde à la place.'),
+      test: 'Quand le mot ne vient pas, on entend un silence, pas un « euh ». Un silence ne compte jamais contre toi.',
+      trap: 'Accélérer pour ne pas hésiter : ralentis et tais-toi à la place.'),
   Lever('structure', 'Structure', ['Suis la structure du genre du sprint.'],
       origin:
           'Exercices préparatoires des écoles grecques (progymnasmata), classés du plus simple au plus difficile.',
@@ -81,15 +85,15 @@ const levers = <Lever>[
       test: 'On retrouve dans la prise les étapes du genre, dans l\'ordre.',
       trap: 'Réciter les étapes au lieu de raconter : la structure doit rester invisible.'),
   Lever('chute', 'Chute', [
-    'Finis ton histoire avant la fin du temps.',
+    'Donne une fin à ton histoire : une dernière phrase nette.',
     'Fais reprendre ta première phrase par la dernière.',
     'Termine par une chute qui retourne l\'histoire.',
   ],
       origin: 'La fable se clôt par sa morale ; c\'est le premier exercice de la série grecque.',
       gain:
           'Dans la rue, savoir conclure et demander. Sur scène, finir une scène au lieu de la laisser mourir.',
-      test: 'L\'histoire est close par une phrase nette avant la fin du chrono.',
-      trap: 'S\'arrêter parce que le temps est fini, sans avoir conclu.'),
+      test: 'L\'histoire est close par une phrase nette.',
+      trap: 'Laisser l\'histoire s\'éteindre sans conclure.'),
   Lever('voix', 'Voix', [
     'Place un silence voulu de 2 secondes.',
     'Change de débit trois fois.',
@@ -147,37 +151,36 @@ const levers = <Lever>[
 
 Lever leverOf(String id) => levers.firstWhere((l) => l.id == id);
 
-/// Ce qu'un sprint apporte de nouveau : durée, cible de « euh » par minute, leviers (id, palier).
+/// Ce qu'un sprint apporte de nouveau : record visé (secondes) et leviers (id, palier).
 class Stage {
-  final int minutes;
-  final double goal;
+  final int? target;
   final List<(String, int)> fresh;
   final bool surprise, exam;
-  const Stage(this.minutes, this.goal, this.fresh, {this.surprise = false, this.exam = false});
+  const Stage(this.target, this.fresh, {this.surprise = false, this.exam = false});
 }
 
 /// Le plan : une étape par niveau, dans l'ordre (l'indice 0 est le sprint « Fiction time »).
 const stages = <Stage>[
-  Stage(3, 3, []),
-  Stage(3, 3, [('chute', 1)]),
-  Stage(3, 2, [('voix', 1)]),
-  Stage(3, 2, [('perso', 1)]),
-  Stage(5, 2, [('emotion', 1)]),
-  Stage(5, 2, [('emotion', 2)]),
-  Stage(5, 1, [('voix', 2), ('voix', 3)]),
-  Stage(5, 1, [('emotion', 3)]),
-  Stage(5, 1, [('images', 2), ('corps', 1)]),
-  Stage(8, 1, [('perso', 2)]),
-  Stage(8, 1, [('images', 3), ('chute', 2)]),
-  Stage(8, 1, [], surprise: true),
-  Stage(8, 1, [('emotion', 4), ('perso', 3), ('chute', 3)], exam: true),
+  Stage(null, []),
+  Stage(30, [('chute', 1)]),
+  Stage(45, [('voix', 1)]),
+  Stage(60, [('perso', 1)]),
+  Stage(90, [('emotion', 1)]),
+  Stage(120, [('emotion', 2)]),
+  Stage(150, [('voix', 2), ('voix', 3)]),
+  Stage(180, [('emotion', 3)]),
+  Stage(180, [('images', 2), ('corps', 1)]),
+  Stage(210, [('perso', 2)]),
+  Stage(240, [('images', 3), ('chute', 2)]),
+  Stage(270, [], surprise: true),
+  Stage(300, [('emotion', 4), ('perso', 3), ('chute', 3)], exam: true),
 ];
 
 const phases = ['', 'Le flux', 'Le flux', 'Le flux', 'La voix et l\'émotion', 'La voix et l\'émotion',
   'La voix et l\'émotion', 'Les personnages et les images', 'Les personnages et les images',
   'Les personnages et les images', 'La maîtrise', 'La maîtrise', 'La maîtrise'];
 
-const startLine = 'Finis ton histoire : ton personnage décide avant la fin du temps.';
+const startLine = 'Donne un prénom et une envie à ton personnage dans les 20 premières secondes.';
 const examLine =
     'Prise d\'examen : une émotion qui monte jusqu\'à la chute, trois personnages, une chute qui retourne l\'histoire.';
 

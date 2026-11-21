@@ -13,11 +13,12 @@ const methodText =
     'gardées devant les yeux qui rendent éloquent. La voix et le corps viennent de l\'action oratoire : '
     'Démosthène la donnait pour première, deuxième et troisième qualité de l\'orateur.\n\n'
     'La progression par paliers suit la pratique délibérée (Ericsson) : un objectif précis, un retour immédiat, '
-    'la même tâche répétée. La cible d\'un « euh » par minute et le silence à la place du « euh » viennent d\'un '
-    'article de praticien (Zandan, 2018), pas d\'une étude scientifique ; une étude de 1995 nuance même ce '
-    'conseil : c\'est la parole sans aucune pause qui y est la mieux notée.\n\n'
-    'La contrainte « sans hésitation » rappelle le jeu radiophonique Just a Minute (BBC, 1967) et le rôle de '
-    'compteur de « euh » chez Toastmasters. Garder un plan d\'étapes et improviser le reste vient de la '
+    'la même tâche répétée. Le silence à la place du « euh » vient d\'un article de praticien (Zandan, 2018), '
+    'pas d\'une étude scientifique ; une étude de 1995 nuance même ce conseil : c\'est la parole sans aucune '
+    'pause qui y est la mieux notée.\n\n'
+    'La règle du jeu, tenir le plus longtemps possible sans hésiter, est celle du jeu radiophonique '
+    'Just a Minute (BBC, 1967) ; compter les « euh » est le rôle de l\'Ah-Counter chez Toastmasters. '
+    'Garder un plan d\'étapes et improviser le reste vient de la '
     'commedia dell\'arte (canevas et lazzi).';
 
 const sources = <Source>[
