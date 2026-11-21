@@ -6,6 +6,7 @@ import 'package:video_player/video_player.dart';
 
 import 'media_io.dart' if (dart.library.js_interop) 'media_web.dart';
 import 'models.dart';
+import 'notes.dart';
 import 'store.dart';
 
 /// Palette claire et sombre.
@@ -622,6 +623,7 @@ class _SyncSheetState extends State<SyncSheet> {
                     final messenger = ScaffoldMessenger.of(context);
                     FocusScope.of(context).unfocus();
                     await store.setLink(repo.text, token.text);
+                    notes.sync();
                     if (store.syncState != 'ok') return;
                     // Réussi : on ferme et on dit ce qui est arrivé.
                     nav.pop();

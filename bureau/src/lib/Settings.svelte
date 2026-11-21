@@ -1,5 +1,6 @@
 <script>
   import { app, saveUi, link } from './store.svelte.js';
+  import { syncNotes } from './notes.svelte.js';
 
   let { close } = $props();
   let repo = $state(app.repo || 'okhamfriction-png/bim-data');
@@ -9,6 +10,7 @@
     ['sprint', 'Sprint en cours', 'Les tâches du sprint, rangées par priorité'],
     ['backlog', 'Backlog', 'Les sprints à venir et les tâches hors sprint'],
     ['agenda', 'Agenda', 'Les blocs fixes et les dates de la semaine'],
+    ['notes', 'Notes', 'Le coffre chiffré : courses, codes, mots de passe'],
   ];
   function toggle(k) {
     const b = app.ui.blocks;
@@ -61,7 +63,7 @@
   <p class:err={app.sync === 'error'} class="state">
     {app.sync === 'ok' ? 'Synchronisé' : app.sync === 'sync' ? 'Synchronisation…' : app.sync === 'error' ? app.error : 'Pas encore relié : rien ne s\'affiche tant que le jeton manque.'}
   </p>
-  <button class="btn primary" disabled={app.sync === 'sync'} onclick={() => link(repo, token)}>
+  <button class="btn primary" disabled={app.sync === 'sync'} onclick={() => link(repo, token).then(syncNotes)}>
     Relier et synchroniser
   </button>
 </div>

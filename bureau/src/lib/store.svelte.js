@@ -50,6 +50,8 @@ export const app = $state({
     ...read('bim.ui', {}),
   },
 });
+// Un bloc ajouté depuis (les notes) s'affiche même si les réglages enregistrés ne le connaissent pas.
+app.ui.blocks = { notes: true, ...app.ui.blocks };
 
 setInterval(() => (app.now = Date.now()), 60000);
 

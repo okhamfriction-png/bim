@@ -7,6 +7,7 @@
   import Task from './lib/Task.svelte';
   import Agenda from './lib/Agenda.svelte';
   import Settings from './lib/Settings.svelte';
+  import Notes from './lib/Notes.svelte';
 
   let settings = $state(!app.token);
   let showDone = $state(false);
@@ -104,6 +105,13 @@
       <section class="block">
         <div class="head"><div><h2>Agenda</h2><span class="muted">Blocs fixes et dates</span></div></div>
         <Agenda />
+      </section>
+    {/if}
+
+    {#if app.ui.blocks.notes}
+      <section class="block">
+        <div class="head"><div><h2>Notes</h2><span class="muted">Coffre chiffré, partagé avec le téléphone</span></div></div>
+        <Notes />
       </section>
     {/if}
   </main>

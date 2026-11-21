@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'notes.dart';
+import 'notes_screen.dart';
 import 'screens.dart';
 import 'store.dart';
 import 'ui.dart';
@@ -8,6 +10,7 @@ import 'ui.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await store.load();
+  await notes.load();
   runApp(const BimApp());
 }
 
@@ -111,6 +114,7 @@ class _ShellState extends State<Shell> {
     _life = AppLifecycleListener(onResume: () {
       store.loadWidgetConfig();
       store.sync();
+      notes.sync();
     });
   }
 
@@ -124,7 +128,7 @@ class _ShellState extends State<Shell> {
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     return ListenableBuilder(
-      listenable: store,
+      listenable: Listenable.merge([store, notes]),
       builder: (context, _) => Scaffold(
         body: SafeArea(
           child: Center(
@@ -146,6 +150,12 @@ class _ShellState extends State<Shell> {
                               color: p.onAccent)),
                     ),
                     const Spacer(),
+                    if (tab == 3 && notes.unlocked)
+                      IconButton(
+                        tooltip: 'Nouvelle note',
+                        onPressed: () => sheet(context, const NoteSheet()),
+                        icon: Icon(Icons.add_circle, color: p.ink, size: 30),
+                      ),
                     if (tab == 0)
                       IconButton(
                         tooltip: 'Nouvelle tâche',
@@ -166,6 +176,7 @@ class _ShellState extends State<Shell> {
                     NowScreen(key: const ValueKey('now')),
                     BacklogScreen(key: const ValueKey('backlog')),
                     AgendaScreen(key: const ValueKey('agenda')),
+                    NotesScreen(key: const ValueKey('notes')),
                   ]),
                 ),
               ]),
@@ -181,6 +192,7 @@ class _ShellState extends State<Shell> {
             NavigationDestination(icon: Icon(Icons.bolt_rounded), label: 'Maintenant'),
             NavigationDestination(icon: Icon(Icons.format_list_bulleted_rounded), label: 'Backlog'),
             NavigationDestination(icon: Icon(Icons.calendar_month_rounded), label: 'Agenda'),
+            NavigationDestination(icon: Icon(Icons.sticky_note_2_rounded), label: 'Notes'),
           ],
         )),
       ),
