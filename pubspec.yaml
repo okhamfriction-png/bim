@@ -43,6 +43,7 @@ dependencies:
   web: ^1.1.1
   cryptography: ^2.9.0
   wakelock_plus: ^1.7.0
+  vibration: ^3.2.1
 
 dev_dependencies:
   flutter_test:

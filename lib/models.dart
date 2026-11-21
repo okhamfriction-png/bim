@@ -64,6 +64,20 @@ class Sub {
 
   int? count(String k) => (data[k] as num?)?.toInt();
 
+  // ---- Prise d'échauffement : durée tenue (secondes), nombre de « euh », deux oui/non ----
+  int? get held => count('duree');
+  int? get euh => count('euh');
+  bool get noted => euh != null && (held ?? 0) > 0;
+
+  /// « Euh » par minute, si la prise est notée.
+  double? get rate => noted ? euh! * 60 / held! : null;
+  double get goal => (data['cible'] as num?)?.toDouble() ?? 3;
+  bool get finished => data['finie'] == true;
+  bool get leverOk => data['levierOk'] == true;
+
+  /// Prise réussie : cible tenue, histoire terminée, levier du jour réussi.
+  bool get success => noted && rate! <= goal && finished && leverOk;
+
   /// Abonnés gagnés pendant le bloc, si les deux compteurs sont notés.
   int? get gained => count('avant') != null && count('apres') != null ? count('apres')! - count('avant')! : null;
 
@@ -110,6 +124,7 @@ class Task {
   bool archived; // tâche terminée rangée dans les archives
   String result; // résultat facultatif, montré dans la revue (« 2 venus »)
   String kind; // type de points de valeur (clé de `kinds`), vide = aucun
+  Map<String, dynamic> meta; // réservé aux échauffements : niveau, durée, cible, leviers
 
   Task({
     String? id,
@@ -132,7 +147,9 @@ class Task {
     this.result = '',
     this.kind = '',
     this.archived = false,
+    Map<String, dynamic>? meta,
   })  : id = id ?? newId(),
+        meta = meta ?? {},
         subs = subs ?? [],
         links = links ?? [],
         createdAt = createdAt ?? nowMs(),
@@ -161,6 +178,7 @@ class Task {
         result: (j['result'] ?? '') as String,
         kind: (j['kind'] ?? '') as String,
         archived: (j['archived'] ?? false) as bool,
+        meta: j['meta'] is Map ? Map<String, dynamic>.from(j['meta'] as Map) : null,
       );
 
   Map<String, dynamic> toJson() => {
@@ -184,6 +202,7 @@ class Task {
         if (result.isNotEmpty) 'result': result,
         if (kind.isNotEmpty) 'kind': kind,
         if (archived) 'archived': true,
+        if (meta.isNotEmpty) 'meta': meta,
       };
 
   /// Catégorie reconnue (les anciennes valeurs retombent sur Mission ou Personnel).
@@ -211,9 +230,12 @@ class Task {
   /// Unités à livrer : une par sous-tâche, sinon la tâche elle-même.
   bool get whole => wholeKinds.contains(kindOf);
 
-  /// Record du sprint : le meilleur score (en secondes) noté sur les prises, 0 si aucun.
-  int get record => subs.fold(
-      0, (a, s) => max(a, int.tryParse(RegExp(r'\d+').firstMatch(s.result)?.group(0) ?? '') ?? 0));
+  /// Meilleure prise du sprint : le moins de « euh » par minute (null si rien n'est noté).
+  double? get bestRate {
+    final r = [for (final s in subs) if (s.noted && s.held! >= 60) s.rate!];
+    return r.isEmpty ? null : r.reduce(min);
+  }
+  int get successes => subs.where((s) => s.success).length;
   int get unitsTotal => subs.isEmpty || whole ? 1 : subs.length;
   int get unitsDone => subs.isEmpty || whole ? (status == 'done' ? 1 : 0) : subsDone;
   Sub? get nextSub => subs.where((s) => !s.done).firstOrNull;

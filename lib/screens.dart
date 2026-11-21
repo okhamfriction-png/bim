@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'defi.dart';
 import 'models.dart';
 import 'store.dart';
 import 'ui.dart';
@@ -1796,6 +1797,7 @@ class ReviewPage extends StatelessWidget {
                   Text('$held / $planned',
                       style: TextStyle(
                           fontSize: 54, height: 1, fontWeight: FontWeight.w900, color: p.ink)),
+                  if (warmups().isNotEmpty) ...[h('ÉCHAUFFEMENT'), const DefiReview()],
                   h('POINTS DE VALEUR'),
                   Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
                     Text('${store.valueWeek}',

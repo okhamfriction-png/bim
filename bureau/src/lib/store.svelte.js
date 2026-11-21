@@ -95,9 +95,33 @@ export function kindOf(t) {
 export const iconOf = (t) => (t.call ? '📞' : KINDS[kindOf(t)]?.icon ?? CAT_ICON[catOf(t)]);
 const subs = (t) => t.subs ?? [];
 export const whole = (t) => WHOLE.has(kindOf(t));
-/** Record du sprint : le meilleur score noté sur les prises, 0 si aucun. */
-export const recordOf = (t) =>
-  subs(t).reduce((a, s) => Math.max(a, parseInt(String(s.result ?? '').match(/\d+/)?.[0] ?? '0', 10)), 0);
+// ---- Prise d'échauffement : durée tenue (secondes), nombre de « euh », deux oui/non ----
+export const noted = (s) => s.data?.euh != null && (s.data?.duree ?? 0) > 0;
+export const rateOf = (s) => (noted(s) ? (s.data.euh * 60) / s.data.duree : null);
+export const priseOk = (s) =>
+  noted(s) && rateOf(s) <= (s.data.cible ?? 3) && s.data.finie === true && s.data.levierOk === true;
+const fr1 = (v) => v.toFixed(1).replace('.', ',');
+export const priseSummary = (s) => (noted(s) ? `${fr1(rateOf(s))} euh/min ${priseOk(s) ? '✓' : '✗'}` : 'Résultat');
+/** Meilleure prise du sprint : le moins de « euh » par minute. */
+export const recordOf = (t) => {
+  const r = subs(t).filter((s) => noted(s) && s.data.duree >= 60).map(rateOf);
+  return r.length ? Math.min(...r) : null;
+};
+/** Note un des 4 résultats d'une prise ; la cible et le levier du sprint sont repris de la tâche. */
+export function setPrise(t, s, key, v) {
+  const d = { cible: t.meta?.cible ?? 3, levier: t.meta?.nouveau?.at(-1) ?? 'depart', ...(s.data ?? {}) };
+  if (key === 'duree') {
+    const m = parseFloat(String(v).replace(',', '.'));
+    if (Number.isNaN(m) || m <= 0) delete d.duree;
+    else d.duree = Math.round(m * 60);
+  } else if (key === 'euh') {
+    const n = parseInt(v, 10);
+    if (Number.isNaN(n)) delete d.euh;
+    else d.euh = n;
+  } else d[key] = !!v;
+  s.data = d;
+  touch(t);
+}
 export const unitsTotal = (t) => (whole(t) ? 1 : subs(t).length || 1);
 export const unitsDone = (t) =>
   subs(t).length && !whole(t) ? subs(t).filter((s) => s.done).length : t.status === 'done' ? 1 : 0;
@@ -131,7 +155,7 @@ export function unitsLabel(t) {
       (noted.length ? ` · ${ab >= 0 ? '+' : ''}${ab} ab. · ${oui} place${oui > 1 ? 's' : ''}` : '');
   }
   return whole(t)
-    ? `${subs(t).filter((s) => s.done).length}/${subs(t).length} prises${recordOf(t) ? ` · record ${recordOf(t)} s` : ''}`
+    ? `${subs(t).filter((s) => s.done).length}/${subs(t).length} prises${recordOf(t) != null ? ` · ${fr1(recordOf(t))} euh/min` : ''}`
     : `${unitsDone(t)}/${unitsTotal(t)} ${k.unit}`;
 }
 /** Points d'un groupe de tâches : « 3/13 pts » dès qu'il y en a de gagnés, sinon « 13 pts ». */

@@ -717,8 +717,8 @@ class SubCheck extends StatelessWidget {
         store.toggleSub(task, sub);
         onChanged?.call();
         // Une prise d'échauffement cochée : on note tout de suite son score.
-        if (task.whole && sub.done && sub.result.isEmpty) {
-          await askScore(context, task, sub);
+        if (task.whole && sub.done && !sub.noted) {
+          await askPrise(context, task, sub);
           onChanged?.call();
         } else if (task.kindOf == 'rue' && sub.done && sub.data.isEmpty) {
           await askBlock(context, task, sub);
@@ -1057,11 +1057,11 @@ class ScorePill extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final rue = task.kindOf == 'rue';
-    final has = rue ? sub.data.isNotEmpty : sub.result.isNotEmpty;
+    final has = rue ? sub.data.isNotEmpty : sub.noted;
     return InkWell(
       borderRadius: BorderRadius.circular(99),
       onTap: () async {
-        await (rue ? askBlock(context, task, sub) : askScore(context, task, sub));
+        await (rue ? askBlock(context, task, sub) : askPrise(context, task, sub));
         onChanged?.call();
       },
       child: Container(
@@ -1071,9 +1071,7 @@ class ScorePill extends StatelessWidget {
         child: Text(
             rue
                 ? (has ? (sub.blockSummary.isEmpty ? 'Noté' : sub.blockSummary) : 'Résultat')
-                : has
-                    ? (int.tryParse(sub.result) != null ? '${sub.result} s' : sub.result)
-                    : 'Score',
+                : priseSummary(sub),
             style: TextStyle(
                 fontSize: 12.5, fontWeight: FontWeight.w800, color: has ? p.ink : p.sub)),
       ),

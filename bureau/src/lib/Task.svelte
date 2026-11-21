@@ -1,7 +1,7 @@
 <script>
   import {
     PRIO, CATS, KINDS, iconOf, pointsLabel, unitsLabel, sprints, dateOf, catOf,
-    complete, reopen, toggleSub, addSub, removeSub, remove, touch, whole, setSubResult, kindOf, BLOCK_FIELDS, blockSummary, hasData, setSubField,
+    complete, reopen, toggleSub, addSub, removeSub, remove, touch, whole, setPrise, priseSummary, noted, kindOf, BLOCK_FIELDS, blockSummary, hasData, setSubField,
   } from './store.svelte.js';
 
   let { t, drag = true } = $props();
@@ -61,9 +61,10 @@
               <input type="checkbox" checked={s.done} onchange={() => toggleSub(t, s)} />
               <span>{s.title}</span>
               {#if whole(t)}
-                <input class="score" type="number" min="0" placeholder="score (s)" title="Secondes avant le premier « euh »"
-                  value={s.result ?? ''} onclick={(e) => e.preventDefault()}
-                  onchange={(e) => setSubResult(t, s, e.currentTarget.value)} />
+                <button class="res" class:has={noted(s)} title="Résultats de la prise"
+                  onclick={(e) => { e.preventDefault(); noting = noting === i ? -1 : i; }}>
+                  {priseSummary(s)}
+                </button>
               {/if}
               {#if kindOf(t) === 'rue'}
                 <button class="res" class:has={hasData(s)} title="Bilan du bloc"
@@ -73,7 +74,22 @@
               {/if}
               <button class="x" title="Retirer" aria-label="Retirer la sous-tâche" onclick={() => removeSub(t, s)}>×</button>
             </label>
-            {#if noting === i}
+            {#if noting === i && whole(t)}
+              <div class="bilan">
+                <label>Durée tenue (min)
+                  <input type="number" min="0" step="0.5" value={s.data?.duree ? Math.round(s.data.duree / 6) / 10 : ''}
+                    onchange={(e) => setPrise(t, s, 'duree', e.currentTarget.value)} />
+                </label>
+                <label>Nombre de « euh »
+                  <input type="number" min="0" value={s.data?.euh ?? ''}
+                    onchange={(e) => setPrise(t, s, 'euh', e.currentTarget.value)} />
+                </label>
+                <label class="yes"><input type="checkbox" checked={s.data?.finie === true}
+                  onchange={(e) => setPrise(t, s, 'finie', e.currentTarget.checked)} /> Histoire terminée</label>
+                <label class="yes"><input type="checkbox" checked={s.data?.levierOk === true}
+                  onchange={(e) => setPrise(t, s, 'levierOk', e.currentTarget.checked)} /> Levier du jour réussi</label>
+              </div>
+            {:else if noting === i}
               <div class="bilan">
                 {#each BLOCK_FIELDS as [key, label, isNum]}
                   <label class:wide={!isNum}>{label}
@@ -162,6 +178,8 @@
   .sub span { flex: 1; }
   .res { flex: none; font-size: 12px; font-weight: 700; padding: 1px 9px; border: 1px solid var(--line); border-radius: 99px; color: var(--sub); }
   .res.has { color: var(--ink); }
+  .bilan .yes { flex-direction: row; align-items: center; gap: 6px; }
+  .bilan .yes input { width: 16px; height: 16px; flex: none; }
   .bilan { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 6px 0 10px 26px; }
   .bilan label { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; font-weight: 700; color: var(--sub); }
   .bilan label.wide { grid-column: span 5; }

@@ -478,7 +478,7 @@ class Store extends ChangeNotifier {
           '${noted.isEmpty ? '' : ' · ${ab >= 0 ? '+' : ''}$ab ab. · $oui place${oui > 1 ? 's' : ''}'}';
     }
     return t.whole
-        ? '${t.subsDone}/${t.subs.length} prises${t.record > 0 ? ' · record ${t.record} s' : ''}'
+        ? '${t.subsDone}/${t.subs.length} prises${t.bestRate != null ? ' · ${t.bestRate!.toStringAsFixed(1).replaceAll('.', ',')} euh/min' : ''}'
         : '${t.unitsDone}/${t.unitsTotal} ${k.$2}';
   }
 
