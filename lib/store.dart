@@ -380,7 +380,7 @@ class Store extends ChangeNotifier {
       final w = schedule.weekOf(d);
       // (début, fin, libellé) : le widget masque ce qui est déjà terminé.
       final lines = <(int, int, String)>[
-        for (final o in schedule.occs(d)) (o.start, o.end, o.block.label),
+        for (final o in schedule.occs(d)) (o.start, o.end, schedule.labelOf(o)),
         for (final e in schedule.eventsOn(d))
           ((e['start'] as num).toInt(), 24 * 60, '${e['label']}'),
         for (final b in schedule.hints(d)) (b.start, b.start, b.label),

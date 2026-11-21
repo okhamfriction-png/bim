@@ -238,16 +238,20 @@ export function dayItems(day) {
     }
     return end;
   };
+  // Une date « étiquette » précise le bloc ce jour-là (la salle de la répétition) sans ajouter de case.
+  const labelOf = (b, orig) =>
+    events.find((e) => e.tag === true && e.date === orig && e.blockId === b.id)?.label ?? b.label;
   for (const b of blocks.filter((b) => b.fixed !== false && on(b, day))) {
     if (moves.some((m) => m.key === `${b.id}|${d}`)) continue;
     const end = cut(b, b.end);
-    if (end > b.start) out.push({ type: 'bloc', start: b.start, end, label: b.label });
+    if (end > b.start) out.push({ type: 'bloc', start: b.start, end, label: labelOf(b, d) });
   }
   for (const m of moves.filter((m) => m.toDate === d)) {
-    const b = blocks.find((b) => b.id === m.key.split('|')[0]);
-    if (b) out.push({ type: 'bloc', start: m.toStart, end: m.toStart + (b.end - b.start), label: b.label });
+    const [id, orig] = m.key.split('|');
+    const b = blocks.find((b) => b.id === id);
+    if (b) out.push({ type: 'bloc', start: m.toStart, end: m.toStart + (b.end - b.start), label: labelOf(b, orig) });
   }
-  for (const e of events.filter((e) => e.date === d)) {
+  for (const e of events.filter((e) => e.date === d && e.tag !== true)) {
     out.push({ type: 'date', start: e.start, end: e.start + 60, label: e.label });
   }
   for (const b of blocks.filter((b) => b.fixed === false && on(b, day))) {

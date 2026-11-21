@@ -439,7 +439,18 @@ class Schedule {
         ..sort((a, b) => a.start.compareTo(b.start));
 
   List<Map<String, dynamic>> eventsOn(DateTime day) =>
-      events.where((e) => e['date'] == ymd(day)).toList();
+      events.where((e) => e['date'] == ymd(day) && e['tag'] != true).toList();
+
+  /// Libellé d'un bloc ce jour-là : une date « étiquette » (`tag`) rattachée au bloc le
+  /// précise (la salle de la répétition, par exemple) sans ajouter de case à l'agenda.
+  String labelOf(Occ o) {
+    for (final e in events) {
+      if (e['tag'] == true && e['date'] == o.origDate && e['blockId'] == o.block.id) {
+        return '${e['label']}';
+      }
+    }
+    return o.block.label;
+  }
 
   /// tenu | manque | ouvert (dans les 15 premières minutes) | attente (pas encore l'heure)
   /// | hors (bloc d'avant la mise en place, non compté).

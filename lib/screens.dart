@@ -112,9 +112,9 @@ class _NowScreenState extends State<NowScreen> {
     final nxt = occs.where((o) => o.start > m).firstOrNull;
     final agenda = [
       if (cur != null)
-        '${cur.block.label} jusqu\'à ${hm(cur.end)}'
+        '${s.labelOf(cur)} jusqu\'à ${hm(cur.end)}'
       else if (nxt != null)
-        '${nxt.block.label} à ${hm(nxt.start)}, dans ${dur(nxt.start - m)}',
+        '${s.labelOf(nxt)} à ${hm(nxt.start)}, dans ${dur(nxt.start - m)}',
       for (final e in s.eventsOn(now)) '${e['label']} à ${hm((e['start'] as num).toInt())}',
     ].join('  ·  ');
     final review = now.weekday == 7 && s.reviewedOn != ymd(now);
@@ -1351,7 +1351,7 @@ class _TimeGrid extends StatelessWidget {
                 for (final o in s.occs(d))
                   () {
                     final st = s.statusOf(o);
-                    return box(o.block.label, _blockColor(o.block.label), o.start, o.end,
+                    return box(s.labelOf(o), _blockColor(o.block.label), o.start, o.end,
                         alpha: st == 'manque' || st == 'hors' ? .4 : 1,
                         icon: st == 'tenu' ? Icons.check_circle : _blockIcon(o.block.label),
                         onTap: st == 'attente'
