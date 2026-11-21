@@ -312,7 +312,7 @@ class _Card extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(top: 14),
                     child: TaskBody(t,
-                        align: t.note.length > 160 ? TextAlign.start : TextAlign.center),
+                        align: !t.whole && t.note.length > 160 ? TextAlign.start : TextAlign.center),
                   ),
                 if (t.source.isNotEmpty)
                   Padding(
@@ -941,8 +941,12 @@ class _TileState extends State<_Tile> {
             padding: const EdgeInsets.fromLTRB(16, 12, 14, 12),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               // Les cases à cocher d'abord : pas besoin de passer le descriptif pour cocher.
+              // Un échauffement montre d'abord son défi et le bouton pour le lancer.
+              if (t.whole) ...[TaskBody(t), const SizedBox(height: 14)],
               if (t.subs.isNotEmpty) ...[SubList(t), const SizedBox(height: 12)],
-              if (t.note.isEmpty && t.links.isEmpty)
+              if (t.whole)
+                const SizedBox.shrink()
+              else if (t.note.isEmpty && t.links.isEmpty)
                 Text('Pas de descriptif.', style: TextStyle(color: p.sub))
               else
                 TaskBody(t),

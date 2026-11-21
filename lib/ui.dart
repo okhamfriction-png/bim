@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
 import 'media_io.dart' if (dart.library.js_interop) 'media_web.dart';
+import 'defi.dart';
 import 'models.dart';
 import 'notes.dart';
 import 'store.dart';
@@ -881,6 +882,8 @@ class TaskBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final t = task;
+    // Un échauffement est un défi : sa fiche remplace le descriptif.
+    if (t.whole) return DefiCard(t, align: align);
     return Column(
         crossAxisAlignment:
             align == TextAlign.center ? CrossAxisAlignment.center : CrossAxisAlignment.start,
