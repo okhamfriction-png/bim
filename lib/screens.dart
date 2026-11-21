@@ -1219,6 +1219,14 @@ class _TimeGrid extends StatelessWidget {
         if (h.start + 30 > hi) hi = h.start + 30;
       }
     }
+    // L'heure qu'il est doit toujours tomber dans la plage, pour que la ligne bleue soit visible.
+    final nowMin = now.hour * 60 + now.minute;
+    final showNow = days.any((d) => ymd(d) == today);
+    if (showNow) {
+      if (nowMin < lo) lo = nowMin;
+      if (nowMin + 30 > hi) hi = nowMin + 30;
+    }
+    const nowBlue = Color(0xFF2563EB);
     final h0 = lo ~/ 60, h1 = ((hi + 59) ~/ 60).clamp(0, 24);
     final hh = height == null
         ? 46.0
@@ -1310,6 +1318,20 @@ class _TimeGrid extends StatelessWidget {
                   top: y(h * 60) - 7,
                   right: 6,
                   child: Text('$h h', style: TextStyle(fontSize: 11, color: p.sub))),
+            // L'heure qu'il est, en bleu, au bout de la ligne « maintenant ».
+            if (showNow)
+              Positioned(
+                top: y(nowMin) - 9,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  decoration: BoxDecoration(
+                      color: nowBlue, borderRadius: BorderRadius.circular(6)),
+                  child: Text('${now.hour}:${now.minute.toString().padLeft(2, '0')}',
+                      style: const TextStyle(
+                          fontSize: 10.5, fontWeight: FontWeight.w800, color: Colors.white)),
+                ),
+              ),
           ]),
         ),
         for (final d in days)
@@ -1362,13 +1384,31 @@ class _TimeGrid extends StatelessWidget {
                       ),
                     ]),
                   ),
-                if (ymd(d) == today && now.hour >= h0 && now.hour < h1)
+                // Ligne « maintenant » : épaisse avec un point sur aujourd'hui, fine sur les autres jours.
+                if (showNow && ymd(d) != today)
                   Positioned(
-                    top: y(now.hour * 60 + now.minute) - 1,
+                    top: y(nowMin),
                     left: 0,
                     right: 0,
-                    child: Container(height: 2, color: const Color(0xFFEF4444)),
+                    child: Container(height: 1, color: nowBlue.withValues(alpha: .35)),
                   ),
+                if (ymd(d) == today) ...[
+                  Positioned(
+                    top: y(nowMin) - 1.5,
+                    left: 0,
+                    right: 0,
+                    child: Container(height: 3, color: nowBlue),
+                  ),
+                  Positioned(
+                    top: y(nowMin) - 5,
+                    left: -1,
+                    child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration:
+                            const BoxDecoration(color: nowBlue, shape: BoxShape.circle)),
+                  ),
+                ],
               ]),
             ),
           ),

@@ -9,7 +9,11 @@
   const week = $derived(app.ui.agendaView === 'semaine');
   const first = $derived(week ? addDays(mondayOf(today), offset * 7) : addDays(today, offset));
   const days = $derived(week ? Array.from({ length: 7 }, (_, i) => addDays(first, i)) : [first]);
-  const nowY = $derived(((today.getHours() * 60 + today.getMinutes()) / 60 - H0) * PX);
+  // Ligne « maintenant » : gardée dans la grille même avant 7 h ou après 22 h.
+  const nowY = $derived(
+    Math.min((H1 - H0) * PX, Math.max(0, ((today.getHours() * 60 + today.getMinutes()) / 60 - H0) * PX)));
+  const showNow = $derived(days.some((d) => ymd(d) === ymd(today)));
+  const clock = $derived(`${today.getHours()}:${String(today.getMinutes()).padStart(2, '0')}`);
   const fmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long' });
   const fmtDay = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 
@@ -58,6 +62,7 @@
       {#each Array.from({ length: H1 - H0 }, (_, i) => H0 + i) as h}
         <span style="top: {(h - H0) * PX}px">{h} h</span>
       {/each}
+      {#if showNow}<span class="clock" style="top: {nowY}px">{clock}</span>{/if}
     </div>
     {#each days as d}
       <div class="col" class:today={ymd(d) === ymd(today)}>
@@ -80,8 +85,8 @@
             </div>
           {/if}
         {/each}
-        {#if ymd(d) === ymd(today) && nowY > 0 && nowY < (H1 - H0) * PX}
-          <div class="now" style="top: {nowY}px"></div>
+        {#if showNow}
+          <div class="now" class:here={ymd(d) === ymd(today)} style="top: {nowY}px"></div>
         {/if}
       </div>
     {/each}
@@ -119,5 +124,8 @@
     position: absolute; top: 1px; left: 3px; right: 3px; font-size: 10.5px; color: #ec4899; font-weight: 700;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .now { position: absolute; left: 0; right: 0; border-top: 2px solid var(--p0); z-index: 3; }
+  .now { position: absolute; left: 0; right: 0; border-top: 1px solid color-mix(in srgb, #2563eb 40%, transparent); z-index: 3; }
+  .now.here { border-top: 3px solid #2563eb; margin-top: -1px; }
+  .now.here::before { content: ''; position: absolute; left: -5px; top: -7px; width: 11px; height: 11px; border-radius: 50%; background: #2563eb; }
+  .hours .clock { z-index: 3; right: 2px; background: #2563eb; color: #fff; font-weight: 800; border-radius: 6px; padding: 1px 5px; }
 </style>
