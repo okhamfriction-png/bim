@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'consignes.dart';
 import 'notes.dart';
 import 'notes_screen.dart';
 import 'screens.dart';
@@ -11,6 +12,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await store.load();
   await notes.load();
+  consignes.start();
   runApp(const BimApp());
 }
 
@@ -115,6 +117,7 @@ class _ShellState extends State<Shell> {
       store.loadWidgetConfig();
       store.sync();
       notes.sync();
+      consignes.refresh();
     });
   }
 
@@ -128,7 +131,7 @@ class _ShellState extends State<Shell> {
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     return ListenableBuilder(
-      listenable: Listenable.merge([store, notes]),
+      listenable: Listenable.merge([store, notes, consignes]),
       builder: (context, _) => Scaffold(
         body: SafeArea(
           child: Center(
@@ -150,6 +153,13 @@ class _ShellState extends State<Shell> {
                               color: p.onAccent)),
                     ),
                     const Spacer(),
+                    if (consignes.all.isNotEmpty)
+                      IconButton(
+                        tooltip: 'Consignes à l\'agent',
+                        onPressed: () => Navigator.of(context)
+                            .push(MaterialPageRoute(builder: (_) => const ConsignesPage())),
+                        icon: Icon(Icons.smart_toy_rounded, color: p.sub),
+                      ),
                     if (tab == 3 && notes.unlocked)
                       IconButton(
                         tooltip: 'Nouvelle note',
@@ -170,6 +180,7 @@ class _ShellState extends State<Shell> {
                     ),
                   ]),
                 ),
+                const ConsignesBanner(),
                 Expanded(
                   child: IndexedStack(index: tab, children: [
                     // Non const : chaque écran se redessine quand le store change.

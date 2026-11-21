@@ -8,7 +8,11 @@
   bim done <début du titre ou de l'identifiant>
 
 Le backlog est le fichier backlog.json du dépôt GitHub privé <compte>/bim-data
-(ou celui de la variable BIM_REPO). L'accès passe par `gh`, déjà connecté.
+(ou celui de la variable BIM_REPO). L'accès passe par `gh`, déjà connecté ; sur une machine
+sans `gh` (le serveur MCP du NAS), il passe par le jeton de la variable BIM_TOKEN.
+
+Ce fichier est aussi le seul chemin d'écriture du serveur MCP (dossier mcp/) : il l'importe
+et passe par `change`, comme la ligne de commande.
 """
 import argparse
 import base64
@@ -21,12 +25,48 @@ import string
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 
 DOMAINS = ["Mission", "Contenu", "Destiny", "Personnel", "Parking"]
 PRIO = {i: f"P{i}" for i in range(5)}
 
 
+class BimError(Exception):
+    """Lecture ou écriture impossible. La ligne de commande s'arrête, le serveur MCP répond une erreur."""
+
+
+def _api(args, body):
+    """Même contrat que `gh api`, avec le jeton BIM_TOKEN : (code, sortie, erreur)."""
+    method, path = "GET", None
+    it = iter(args)
+    for a in it:
+        if a == "-X":
+            method = next(it)
+        elif a == "--input":
+            next(it)
+        elif a == "-q":
+            next(it)
+        else:
+            path = a
+    req = urllib.request.Request(
+        f"{os.environ.get('GITHUB_API', 'https://api.github.com')}/{path}",
+        data=body.encode("utf-8") if body else None, method=method,
+        headers={"Authorization": f"Bearer {os.environ['BIM_TOKEN']}",
+                 "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28",
+                 "User-Agent": "bim", "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return 0, r.read().decode("utf-8"), ""
+    except urllib.error.HTTPError as e:
+        return 1, e.read().decode("utf-8", "replace"), f"HTTP {e.code}"
+    except OSError as e:
+        return 1, "", f"réseau : {e}"
+
+
 def gh(*args, body=None):
+    if os.environ.get("BIM_TOKEN"):
+        return _api(args, body)
     r = subprocess.run(["gh", "api", *args], input=body, capture_output=True, text=True)
     return r.returncode, r.stdout, r.stderr
 
@@ -36,26 +76,44 @@ def repo():
         return os.environ["BIM_REPO"]
     code, out, err = gh("user", "-q", ".login")
     if code:
-        sys.exit(f"gh n'est pas connecté : {err.strip()}")
+        raise BimError(f"gh n'est pas connecté : {err.strip()}")
     return f"{out.strip()}/bim-data"
+
+
+EMPTY = {
+    "backlog.json": lambda: {"version": 1, "tasks": [], "schedule": {}},
+    "consignes.json": lambda: {"v": 1, "consignes": []},
+}
 
 
 def load(path):
     code, out, err = gh(path)
     if code:
         if "404" in err or "Not Found" in out:
-            return {"version": 1, "tasks": [], "schedule": {}}, None
-        sys.exit(f"Lecture impossible : {err.strip() or out.strip()}")
+            return EMPTY[path.rsplit("/", 1)[-1]](), None
+        raise BimError(f"Lecture impossible : {err.strip() or out.strip()[:300]}")
     j = json.loads(out)
     return json.loads(base64.b64decode(j["content"]).decode("utf-8")), j["sha"]
 
 
-def change(fn, message):
-    """Lit le backlog, applique fn, réécrit ; recommence si quelqu'un a écrit entre-temps."""
-    path = f"repos/{repo()}/contents/backlog.json"
+def read(name="backlog.json"):
+    """Le contenu d'un fichier du dépôt de données, sans rien écrire."""
+    return load(f"repos/{repo()}/contents/{name}")[0]
+
+
+def change(fn, message, name="backlog.json"):
+    """Lit le fichier, applique fn, réécrit ; recommence si quelqu'un a écrit entre-temps.
+
+    Seul chemin d'écriture vers le dépôt de données, pour la ligne de commande comme pour
+    le serveur MCP. Si fn lève une exception, rien n'est écrit.
+    """
+    path = f"repos/{repo()}/contents/{name}"
     for _ in range(4):
         doc, sha = load(path)
+        before = json.dumps(doc, ensure_ascii=False, sort_keys=True)
         result = fn(doc)
+        if json.dumps(doc, ensure_ascii=False, sort_keys=True) == before:
+            return result
         body = {
             "message": message,
             "content": base64.b64encode(
@@ -68,9 +126,9 @@ def change(fn, message):
         if code == 0:
             return result
         if "409" not in err and "422" not in err:
-            sys.exit(f"Écriture impossible : {err.strip() or out.strip()}")
+            raise BimError(f"Écriture impossible : {err.strip() or out.strip()[:300]}")
         time.sleep(1)
-    sys.exit("Conflit de synchro répété, réessaie.")
+    raise BimError("Conflit de synchro répété, réessaie.")
 
 
 def upload(path, tid):
@@ -106,6 +164,40 @@ def order(t):
     return (t.get("priority", 2), DOMAINS.index(cat(t)), t.get("rank", 0))
 
 
+def new_id():
+    return "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
+
+
+def new_task(doc, title, domain="Personnel", priority=2, note="", links=None, source="",
+             call=False, sprint=None, tid=None):
+    """Ajoute une tâche au document ; None si une tâche ouverte porte déjà ce titre."""
+    tasks = doc.setdefault("tasks", [])
+    title = title.strip()
+    for t in tasks:
+        if is_open(t) and t["title"].strip().lower() == title.lower():
+            return None
+    t = {
+        "id": tid or new_id(),
+        "title": title,
+        "note": note,
+        "links": list(links or []),
+        "domain": domain,
+        "priority": priority,
+        "source": source,
+        "rank": max([x.get("rank", 0) for x in tasks] + [0]) + 1,
+        "status": "todo",
+        "createdAt": now_ms(),
+        "updatedAt": now_ms(),
+        "doneAt": None,
+        "pickedOn": None,
+        "call": bool(call) and domain == "Mission",
+        "sprint": sprint,
+        "deleted": False,
+    }
+    tasks.append(t)
+    return t
+
+
 def cmd_add(a):
     if a.domain not in DOMAINS:
         sys.exit(f"Domaine inconnu. Choix : {', '.join(DOMAINS)}")
@@ -114,35 +206,14 @@ def cmd_add(a):
         with open(a.note_file, encoding="utf-8") as f:
             note = (note + "\n\n" if note else "") + f.read().strip()
 
-    tid = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
+    tid = new_id()
     links = list(a.link or [])
     for path in a.file or []:
         links.append(upload(path, tid))
 
     def fn(doc):
-        tasks = doc.setdefault("tasks", [])
-        for t in tasks:
-            if is_open(t) and t["title"].strip().lower() == a.title.strip().lower():
-                return None
-        t = {
-            "id": tid,
-            "title": a.title.strip(),
-            "note": note,
-            "links": links,
-            "domain": a.domain,
-            "priority": a.priority,
-            "source": a.source,
-            "rank": max([x.get("rank", 0) for x in tasks] + [0]) + 1,
-            "status": "todo",
-            "createdAt": now_ms(),
-            "updatedAt": now_ms(),
-            "doneAt": None,
-            "pickedOn": None,
-            "call": bool(a.call) and a.domain == "Mission",
-            "deleted": False,
-        }
-        tasks.append(t)
-        return t
+        return new_task(doc, a.title, a.domain, a.priority, note=note, links=links,
+                        source=a.source, call=a.call, tid=tid)
 
     t = change(fn, f"bim : + {a.title.strip()[:60]}")
     print(f"Ajoutée ({a.domain}, {PRIO[a.priority]}) : {a.title}" if t
@@ -231,7 +302,10 @@ def main():
     r.add_argument("key")
     r.set_defaults(fn=cmd_rm)
     args = p.parse_args()
-    args.fn(args)
+    try:
+        args.fn(args)
+    except BimError as e:
+        sys.exit(str(e))
 
 
 if __name__ == "__main__":

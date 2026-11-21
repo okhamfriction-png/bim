@@ -37,3 +37,9 @@ export PATH="$HOME/development/flutter/bin:$PATH"
 flutter build apk --release
 flutter build web --release --base-href /bim/
 ```
+
+## Connecteur Claude (`mcp/`)
+
+Serveur MCP distant (Streamable HTTP + OAuth) pour piloter Bim depuis claude.ai : voir
+[mcp/README.md](mcp/README.md). Il écrit par `change` de `bin/bim`, comme la ligne de commande.
+L'ancien `connecteur/` (Cloudflare Workers, clé dans l'adresse) est remplacé par celui-ci.

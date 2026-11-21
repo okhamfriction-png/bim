@@ -1,0 +1,31 @@
+# Sur le NAS : docker compose up -d --build   (depuis ce dossier, fichier .env à côté)
+# Le conteneur n'écoute que sur le NAS lui-même (127.0.0.1) : rien n'est joignable du réseau
+# tant que le tunnel ou le reverse proxy ne pointe pas dessus.
+services:
+  bim-mcp:
+    build:
+      context: ..
+      dockerfile: mcp/Dockerfile
+    restart: unless-stopped
+    environment:
+      APP: bim
+      URL_PUBLIQUE: ${URL_PUBLIQUE}   # https://bim.ton-domaine.fr, sans chemin ni barre finale
+      BIM_REPO: ${BIM_REPO}           # compte/bim-data
+      BIM_TOKEN: ${BIM_TOKEN}         # jeton GitHub limité à ce dépôt (Contents : lecture et écriture)
+    volumes:
+      - ./donnees:/donnees            # mot de passe (haché), jetons (hachés), journal des appels
+    ports:
+      - "127.0.0.1:8793:8793"
+
+  # Option tunnel : aucune ouverture de port sur la box. Lancer avec : docker compose --profile tunnel up -d
+  tunnel:
+    profiles: ["tunnel"]
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    depends_on: [bim-mcp]
+
+  # Pour brancher une autre appli (Publier, Destiny Montage) : un module apps/<nom>.py, puis un
+  # service comme bim-mcp avec APP=<nom>, son propre port, son URL_PUBLIQUE et son dossier de données.
