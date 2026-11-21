@@ -541,9 +541,16 @@ class _SyncSheetState extends State<SyncSheet> {
       builder: (context, _) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
         const Text('Réglages', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
         _label(context, 'APPARENCE'),
-        Segmented(const {'system': 'Système', 'light': 'Clair', 'dark': 'Sombre'},
+        Segmented(const {'system': 'Système', 'light': 'Clair', 'dark': 'Sombre', 'auto': 'Horaire'},
             store.themeMode, store.setThemeMode,
             expand: true),
+        if (store.themeMode == 'auto') ...[
+          const SizedBox(height: 8),
+          Stepper2('Sombre à partir de (h)', store.darkFrom, (v) => store.setThemeHours(dark: v),
+              max: 23),
+          Stepper2('Clair à partir de (h)', store.lightFrom, (v) => store.setThemeHours(light: v),
+              max: 23),
+        ],
         _label(context, 'VUE DE L\'AGENDA À L\'OUVERTURE'),
         Wrap(spacing: 8, runSpacing: 8, children: [
           for (final v in const [

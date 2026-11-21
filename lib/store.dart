@@ -17,7 +17,24 @@ class Store extends ChangeNotifier {
 
   String repo = '';
   String token = '';
-  String themeMode = 'system'; // apparence : system | light | dark
+  String themeMode = 'system'; // apparence : system | light | dark | auto (selon l'heure)
+  int darkFrom = 19; // en mode horaire : heure où l'appli passe en sombre
+  int lightFrom = 7; // en mode horaire : heure où elle repasse en clair
+
+  /// Vrai si le mode horaire demande le thème sombre à cette heure-ci.
+  bool get darkNow {
+    final h = DateTime.now().hour;
+    if (darkFrom == lightFrom) return false;
+    return darkFrom > lightFrom ? (h >= darkFrom || h < lightFrom) : (h >= darkFrom && h < lightFrom);
+  }
+
+  void setThemeHours({int? dark, int? light}) {
+    if (dark != null) darkFrom = dark % 24;
+    if (light != null) lightFrom = light % 24;
+    _prefs.setInt('darkFrom', darkFrom);
+    _prefs.setInt('lightFrom', lightFrom);
+    notifyListeners();
+  }
   int widgetOpacity = 100; // opacité du fond du widget Android, en %
   Set<int> widgetPrios = {0, 1, 2, 3, 4}; // priorités montrées dans le widget
   String agendaView = 'semaine'; // vue de l'agenda à l'ouverture : jour | semaine | mois | annee
@@ -35,6 +52,8 @@ class Store extends ChangeNotifier {
     token = _prefs.getString('token') ?? '';
     agendaView = _prefs.getString('agendaView') ?? 'semaine';
     themeMode = _prefs.getString('themeMode') ?? 'system';
+    darkFrom = _prefs.getInt('darkFrom') ?? 19;
+    lightFrom = _prefs.getInt('lightFrom') ?? 7;
     widgetOpacity = _prefs.getInt('widgetOpacity') ?? 100;
     widgetPrios = (_prefs.getStringList('widgetPrios') ?? ['0', '1', '2', '3', '4'])
         .map(int.parse)

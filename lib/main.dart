@@ -82,6 +82,7 @@ class BimApp extends StatelessWidget {
         themeMode: switch (store.themeMode) {
           'light' => ThemeMode.light,
           'dark' => ThemeMode.dark,
+          'auto' => store.darkNow ? ThemeMode.dark : ThemeMode.light,
           _ => ThemeMode.system,
         },
         debugShowCheckedModeBanner: false,

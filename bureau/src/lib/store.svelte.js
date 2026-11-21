@@ -42,7 +42,9 @@ export const app = $state({
   error: '',
   now: Date.now(),
   ui: {
-    theme: 'system', // system | light | dark
+    theme: 'system', // system | light | dark | auto (selon l'heure)
+    darkFrom: 19, // en mode horaire : heure de passage en sombre
+    lightFrom: 7, // et de retour en clair
     blocks: { sprint: true, backlog: false, agenda: true },
     agendaView: 'semaine', // jour | semaine
     ...read('bim.ui', {}),

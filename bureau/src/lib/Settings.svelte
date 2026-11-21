@@ -39,10 +39,20 @@
 
   <h3>Apparence</h3>
   <div class="seg">
-    {#each [['system', 'Système'], ['light', 'Clair'], ['dark', 'Sombre']] as [v, n]}
+    {#each [['system', 'Système'], ['light', 'Clair'], ['dark', 'Sombre'], ['auto', 'Horaire']] as [v, n]}
       <button class:on={app.ui.theme === v} onclick={() => theme(v)}>{n}</button>
     {/each}
   </div>
+  {#if app.ui.theme === 'auto'}
+    <p class="muted">
+      Sombre à partir de
+      <input class="hour" type="number" min="0" max="23" value={app.ui.darkFrom}
+        onchange={(e) => { app.ui.darkFrom = Math.min(23, Math.max(0, +e.currentTarget.value || 0)); saveUi(); }} /> h,
+      clair à partir de
+      <input class="hour" type="number" min="0" max="23" value={app.ui.lightFrom}
+        onchange={(e) => { app.ui.lightFrom = Math.min(23, Math.max(0, +e.currentTarget.value || 0)); saveUi(); }} /> h.
+    </p>
+  {/if}
 
   <h3>Synchronisation</h3>
   <p class="muted">Le même fichier que sur le téléphone, dans ton dépôt GitHub privé.</p>
@@ -78,4 +88,5 @@
   .state.err { color: var(--p0); }
   .primary { padding: 11px; }
   p { margin: 0; }
+  input.hour { width: 58px; padding: 2px 6px; }
 </style>

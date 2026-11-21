@@ -12,7 +12,15 @@
   let showDone = $state(false);
 
   $effect(() => {
-    document.documentElement.dataset.theme = app.ui.theme === 'system' ? '' : app.ui.theme;
+    let t = app.ui.theme;
+    if (t === 'auto') {
+      // Mode horaire : sombre entre les deux heures choisies.
+      const h = new Date(app.now).getHours();
+      const { darkFrom: d, lightFrom: l } = app.ui;
+      const dark = d === l ? false : d > l ? h >= d || h < l : h >= d && h < l;
+      t = dark ? 'dark' : 'light';
+    }
+    document.documentElement.dataset.theme = t === 'system' ? '' : t;
   });
   sync();
 
