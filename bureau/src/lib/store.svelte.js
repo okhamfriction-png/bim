@@ -46,6 +46,7 @@ export const app = $state({
     darkFrom: 19, // en mode horaire : heure de passage en sombre
     lightFrom: 7, // et de retour en clair
     blocks: { sprint: true, backlog: false, agenda: true },
+    focus: '', // bloc affiché seul (sprint | backlog | agenda | notes), vide = ceux des réglages
     agendaView: 'semaine', // jour | semaine
     ...read('bim.ui', {}),
   },
@@ -168,9 +169,139 @@ export function valueLabel(t) {
     : pts(coefOf(t));
 }
 
-export const sprintOf = (t) => (t.sprint && t.sprint >= thisMonday() ? t.sprint : null);
+// ---- Sprints et clôture (mêmes règles que lib/store.dart) ----
+
+const closures = () => sched().closures ?? {};
+export const closed = (s) => closures()[s]?.closedAt != null;
+/** Le sprint en cours : celui de la semaine, ou le suivant une fois celui-ci clôturé. */
+export const current = () => {
+  let m = mondayOf(new Date(app.now));
+  while (closed(ymd(m))) m = addDays(m, 7);
+  return ymd(m);
+};
+/** Un sprint passé reste ouvert tant qu'il n'est pas clôturé : rien n'est reporté tout seul. */
+const late = (s) =>
+  s < thisMonday() && !closed(s) && (sched().sprints ?? []).includes(s) &&
+  app.doc.tasks.some((t) => !t.deleted && t.sprint === s);
+export const sprintOf = (t) => {
+  const s = t.sprint;
+  if (!s || closed(s)) return null;
+  return s >= thisMonday() || late(s) ? s : null;
+};
 export const sprints = () =>
-  [...new Set((sched().sprints ?? []).filter((s) => s >= thisMonday()))].sort();
+  [...new Set((sched().sprints ?? []).filter((s) => !closed(s) && (s >= thisMonday() || late(s))))].sort();
+export const closedSprints = () => Object.keys(closures()).filter(closed).sort().reverse();
+export const closureOf = (s) => closures()[s];
+export const nextSprint = (s) => {
+  let m = dateOf(s);
+  do m = addDays(m, 7);
+  while (closed(ymd(m)));
+  return ymd(m);
+};
+/** Terminée pour de bon : cochée, et toutes ses sous-tâches aussi. */
+export const isComplete = (t) => t.status === 'done' && subs(t).every((x) => x.done);
+export const reportsOf = (t) => t.meta?.reports ?? 0;
+export const BILAN_CATS = ['Rue', 'Vidéo', 'Short', 'Rangement', 'Échauffement'];
+const bilanCat = (t) =>
+  ({ rue: 'Rue', paris: 'Vidéo', montee: 'Vidéo', short: 'Short', rangement: 'Rangement', echauffement: 'Échauffement' })[kindOf(t)] ?? '';
+export const sprintComplete = (s) =>
+  app.doc.tasks.filter((t) => !t.deleted && t.sprint === s && isComplete(t)).sort(order);
+export const sprintUnfinished = (s) =>
+  app.doc.tasks
+    .filter((t) => !t.deleted && t.sprint === s && !isComplete(t) && t.status !== 'dropped')
+    .sort(order);
+
+/** Le bilan d'un sprint tel qu'il serait figé avec ces choix (tâche → report | parking | drop). */
+export function closureDraft(s, choices) {
+  const done = sprintComplete(s);
+  const rest = sprintUnfinished(s);
+  const byCat = Object.fromEntries(BILAN_CATS.map((c) => [c, 0]));
+  for (const t of done) {
+    const c = bilanCat(t);
+    if (c) byCat[c] += plannedOf(t);
+  }
+  const pick = (what) => rest.filter((t) => choices[t.id] === what).map((t) => ({ id: t.id, title: t.title }));
+  return {
+    target: targetOf(s),
+    points: Object.values(byCat).reduce((a, b) => a + b, 0),
+    byCat,
+    done: done.map((t) => ({ id: t.id, title: t.title, points: plannedOf(t), ...(t.result ? { result: t.result } : {}) })),
+    carried: pick('report'),
+    parked: pick('parking'),
+    dropped: pick('drop'),
+  };
+}
+
+/** Clôture : fige le bilan, applique le choix fait pour chaque tâche non terminée, crée le sprint suivant. */
+export function closeSprint(s, choices, prios, keep = '', decisions = '') {
+  const rest = sprintUnfinished(s);
+  if (closed(s) || rest.some((t) => !choices[t.id])) return false;
+  const now = Date.now();
+  const next = nextSprint(s);
+  const bilan = closureDraft(s, choices);
+  const back = (t) => {
+    if (t.status === 'done') {
+      t.status = 'todo';
+      t.doneAt = null;
+      t.archived = false;
+    }
+  };
+  for (const t of rest) {
+    if (choices[t.id] === 'report') {
+      t.sprint = next;
+      t.priority = prios[t.id] ?? t.priority;
+      t.meta = { ...(t.meta ?? {}), reports: reportsOf(t) + 1, reporteDe: s };
+      back(t);
+    } else if (choices[t.id] === 'parking') {
+      t.domain = 'Parking';
+      t.priority = 4;
+      t.sprint = null;
+      t.pickedOn = null;
+      t.call = false;
+      back(t);
+    } else {
+      t.status = 'dropped';
+      t.archived = true;
+      t.pickedOn = null;
+    }
+    t.updatedAt = now;
+  }
+  const sc = (app.doc.schedule ??= {});
+  if (!(sc.sprints ?? []).includes(next)) sc.sprints = [...(sc.sprints ?? []), next].sort();
+  sc.closures = {
+    ...(sc.closures ?? {}),
+    [s]: { ...bilan, closedAt: now, at: now, next, keep: keep.trim(), decisions: decisions.trim() },
+  };
+  sc.updatedAt = now;
+  changed();
+  return true;
+}
+/** Rouvre un sprint clôturé ; les tâches restent où la clôture les a mises. */
+export function reopenSprint(s) {
+  if (!closed(s)) return;
+  const sc = app.doc.schedule;
+  sc.closures = { ...sc.closures, [s]: { reopenedAt: Date.now(), at: Date.now() } };
+  sc.updatedAt = Date.now();
+  changed();
+}
+export const closedPoints = (s) => closures()[s]?.points ?? 0;
+export const velocity = () => {
+  const last = closedSprints().slice(0, 3);
+  return last.length ? last.reduce((a, s) => a + closedPoints(s), 0) / last.length : null;
+};
+export const velocityLabel = () => {
+  const v = velocity();
+  if (v == null) return '';
+  const n = closedSprints().slice(0, 3).length;
+  const x = Number.isInteger(v) ? `${v}` : v.toFixed(1).replace('.', ',');
+  return n === 1 ? `dernier sprint : ${x}` : `moyenne des ${n} derniers sprints : ${x}`;
+};
+export function setResult(t, v) {
+  const x = String(v ?? '').trim();
+  if (x) t.result = x;
+  else delete t.result;
+  touch(t);
+}
 export const backlog = () => app.doc.tasks.filter(isOpen).sort(order);
 export const sprintTasks = (s) => backlog().filter((t) => !parked(t) && sprintOf(t) === s);
 export const looseTasks = () => backlog().filter((t) => parked(t) || sprintOf(t) == null);
@@ -432,8 +563,14 @@ const b64encode = (s) => {
   return btoa(bin);
 };
 const canon = (tasks) => JSON.stringify([...tasks].sort((a, b) => (a.id < b.id ? -1 : 1)));
+/** Ce que le bureau écrit dans l'agenda : les clôtures et les sprints créés par une clôture. */
+const canonSprints = (d) => {
+  const c = d.schedule?.closures ?? {};
+  return JSON.stringify([[...(d.schedule?.sprints ?? [])].sort(), Object.keys(c).sort().map((k) => [k, c[k].at ?? 0])]);
+};
 
-/** Fusion par tâche : la version la plus récente gagne. L'agenda vient toujours du dépôt. */
+/** Fusion par tâche : la version la plus récente gagne. L'agenda vient du dépôt, sauf les
+ *  clôtures (pour un même sprint, la décision la plus récente l'emporte) et les sprints, réunis. */
 function merge(remote) {
   const mine = new Map(app.doc.tasks.map((t) => [t.id, t]));
   const out = [];
@@ -443,7 +580,16 @@ function merge(remote) {
     mine.delete(r.id);
   }
   for (const l of mine.values()) out.push($state.snapshot(l));
-  return { ...remote, tasks: out };
+  const ls = $state.snapshot(app.doc.schedule ?? {});
+  const rs = remote.schedule ?? {};
+  const cl = { ...(rs.closures ?? {}) };
+  for (const [k, v] of Object.entries(ls.closures ?? {})) {
+    if ((v.at ?? 0) > (cl[k]?.at ?? 0)) cl[k] = v;
+  }
+  const schedule = { ...rs, sprints: [...new Set([...(rs.sprints ?? []), ...(ls.sprints ?? [])])].sort() };
+  if (Object.keys(cl).length) schedule.closures = cl;
+  if (canonSprints({ schedule }) !== canonSprints(remote)) schedule.updatedAt = Math.max(rs.updatedAt ?? 0, ls.updatedAt ?? 0);
+  return { ...remote, tasks: out, schedule };
 }
 
 let busy = false;
@@ -478,7 +624,7 @@ export async function sync() {
       const merged = merge(remote);
       app.doc = merged;
       write('bim.doc', merged);
-      if (canon(merged.tasks) === canon(remote.tasks ?? [])) break;
+      if (canon(merged.tasks) === canon(remote.tasks ?? []) && canonSprints(merged) === canonSprints(remote)) break;
       const p = await fetch(base, {
         method: 'PUT',
         headers,

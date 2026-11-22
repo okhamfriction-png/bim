@@ -2,7 +2,10 @@
   import {
     app, sync, thisMonday, sprints, sprintTasks, looseTasks, doneThisWeek, dateOf, addDays,
     valueWeek, valueToday, bonus, BONUS_EVERY, targetOf, plannedIn, p0In,
+    current, closedSprints, closureOf, velocityLabel, saveUi,
   } from './lib/store.svelte.js';
+  import Cloture from './lib/Cloture.svelte';
+  import Historique from './lib/Historique.svelte';
   import Lanes from './lib/Lanes.svelte';
   import Task from './lib/Task.svelte';
   import Agenda from './lib/Agenda.svelte';
@@ -11,6 +14,8 @@
 
   let settings = $state(!app.token);
   let showDone = $state(false);
+  let closing = $state(null); // sprint en cours de clôture
+  let history = $state(false);
 
   $effect(() => {
     let t = app.ui.theme;
@@ -26,18 +31,30 @@
   sync();
 
   const now = $derived(new Date(app.now));
-  const cur = $derived(thisMonday());
+  const cur = $derived(current());
   const target = $derived(targetOf(cur));
   const value = $derived(valueWeek());
   const tokens = $derived(bonus());
   const fmtDate = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
   const fmtShort = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' });
   const range = (s) => `${fmtShort.format(dateOf(s))} – ${fmtShort.format(addDays(dateOf(s), 6))}`;
-  const cols = $derived(Object.values(app.ui.blocks).filter(Boolean).length);
+  // Onglets : un bloc seul, ou « Tout » pour ceux cochés dans les réglages.
+  const TABS = [['sprint', 'Sprint'], ['backlog', 'Backlog'], ['agenda', 'Agenda'], ['notes', 'Notes']];
+  const show = (k) => (app.ui.focus ? app.ui.focus === k : app.ui.blocks[k]);
+  const cols = $derived(TABS.filter(([k]) => show(k)).length);
+  function focus(k) {
+    app.ui.focus = k;
+    saveUi();
+  }
+  const fmtLong = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long' });
+  // Un sprint se clôture une fois commencé : celui en cours, ou un sprint passé resté ouvert.
+  const closable = (s) => s <= thisMonday();
+  const lastClosed = $derived(closedSprints()[0]);
   const warn = (s) => plannedIn(s) < targetOf(s) || p0In(s) > 3;
   const plan = (s) =>
     `Prévu ${plannedIn(s)} pts · cible ${targetOf(s)}` +
     (plannedIn(s) < targetOf(s) ? ' · sous la cible' : '') +
+    (velocityLabel() ? ` · ${velocityLabel()}` : '') +
     (p0In(s) > 3 ? ` · ${p0In(s)} P0 (3 max)` : '');
 </script>
 
@@ -52,6 +69,12 @@
         🎟️ {tokens.left > 0 ? `${tokens.left} jeton${tokens.left > 1 ? 's' : ''} bonus à dépenser` : `Jeton bonus : ${tokens.progress} / ${BONUS_EVERY} pts de rue`}
       </span>
     </div>
+    <nav class="tabs" aria-label="Blocs affichés">
+      <button class:on={!app.ui.focus} onclick={() => focus('')} title="Les blocs cochés dans les réglages">Tout</button>
+      {#each TABS as [k, name]}
+        <button class:on={app.ui.focus === k} onclick={() => focus(k)}>{name}</button>
+      {/each}
+    </nav>
     <span class="grow"></span>
     <button class="sync {app.sync}" onclick={sync} title={app.sync === 'error' ? app.error : 'Synchroniser'}>
       <i></i>{app.sync === 'ok' ? 'Synchronisé' : app.sync === 'sync' ? 'Synchro…' : app.sync === 'error' ? 'Erreur de synchro' : 'Non relié'}
@@ -61,7 +84,7 @@
   </header>
 
   <main style="grid-template-columns: repeat({cols}, minmax(0, 1fr))">
-    {#if app.ui.blocks.sprint}
+    {#if show('sprint')}
       <section class="block">
         <div class="head accent">
           <div>
@@ -69,7 +92,14 @@
             <span class="muted">{range(cur)}</span>
           </div>
           <span class="plan" class:warn={warn(cur)}>{plan(cur)}</span>
+          {#if closable(cur)}<button class="btn primary" onclick={() => (closing = cur)}>Clôturer le sprint</button>{/if}
         </div>
+        {#if lastClosed}
+          <div class="sub closed">
+            <span>🔒 <b>Sprint du {fmtLong.format(dateOf(lastClosed))} clôturé</b> · {closureOf(lastClosed).points} / {closureOf(lastClosed).target} pts</span>
+            <button class="btn" onclick={() => (history = true)}>Historique</button>
+          </div>
+        {/if}
         <div class="scroll">
           <Lanes tasks={sprintTasks(cur)} sprint={cur} />
           {#if doneThisWeek().length}
@@ -84,14 +114,15 @@
       </section>
     {/if}
 
-    {#if app.ui.blocks.backlog}
+    {#if show('backlog')}
       <section class="block">
         <div class="head"><div><h2>Backlog</h2><span class="muted">Sprints à venir et hors sprint</span></div></div>
         <div class="scroll">
           {#each sprints().filter((s) => s !== cur) as s (s)}
             <div class="sub">
-              <b>Sprint du {range(s)}</b>
+              <b>{s < cur ? 'Sprint à clôturer · ' : 'Sprint du '}{range(s)}</b>
               <span class="plan" class:warn={warn(s)}>{plan(s)}</span>
+              {#if closable(s)}<button class="btn primary" onclick={() => (closing = s)}>Clôturer</button>{/if}
             </div>
             <Lanes tasks={sprintTasks(s)} sprint={s} adder={false} />
           {/each}
@@ -101,14 +132,14 @@
       </section>
     {/if}
 
-    {#if app.ui.blocks.agenda}
+    {#if show('agenda')}
       <section class="block">
         <div class="head"><div><h2>Agenda</h2><span class="muted">Blocs fixes et dates</span></div></div>
         <Agenda />
       </section>
     {/if}
 
-    {#if app.ui.blocks.notes}
+    {#if show('notes')}
       <section class="block">
         <div class="head"><div><h2>Notes</h2><span class="muted">Courses et coffre chiffré, partagés avec le téléphone</span></div></div>
         <Notes />
@@ -118,6 +149,8 @@
 </div>
 
 {#if settings}<Settings close={() => (settings = false)} />{/if}
+{#if closing}<Cloture sprint={closing} close={() => (closing = null)} />{/if}
+{#if history}<Historique close={() => (history = false)} />{/if}
 
 <style>
   .app { height: 100%; display: flex; flex-direction: column; }
@@ -135,6 +168,10 @@
   .bar { height: 6px; border-radius: 99px; background: var(--line); overflow: hidden; }
   .bar i { display: block; height: 100%; background: var(--ok); border-radius: 99px; transition: width .3s; }
   .grow { flex: 1; }
+  .tabs { display: flex; gap: 2px; padding: 3px; background: var(--line); border-radius: 11px; }
+  .tabs button { padding: 6px 13px; border-radius: 8px; font-size: 13.5px; font-weight: 800; color: var(--sub); }
+  .tabs button.on { background: var(--card); color: var(--ink); }
+  .closed { font-size: 13.5px; }
   a.btn { text-decoration: none; color: inherit; }
   .sync { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; color: var(--sub); }
   .sync i { width: 9px; height: 9px; border-radius: 50%; background: var(--p4); }

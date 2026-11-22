@@ -9,7 +9,16 @@
   let sub = $state('');
   let noting = $state(-1); // bloc de rue dont on remplit le bilan
   const done = $derived(t.status === 'done');
-  const label = $derived(unitsLabel(t));
+  // « 0/3 blocs · reportée du sprint du 16 novembre (2 reports) »
+  const label = $derived(
+    [
+      unitsLabel(t),
+      t.meta?.reports && t.meta?.reporteDe
+        ? `reportée du sprint du ${dateOf(t.meta.reporteDe).getDate()} ${dateOf(t.meta.reporteDe).toLocaleDateString('fr-FR', { month: 'long' })}` +
+          (t.meta.reports > 1 ? ` (${t.meta.reports} reports)` : '')
+        : '',
+    ].filter(Boolean).join(' · '),
+  );
   const points = $derived(pointsLabel(t));
   const sprintName = (s) => `Sprint du ${dateOf(s).getDate()}/${dateOf(s).getMonth() + 1}`;
 
