@@ -214,13 +214,158 @@ class Store extends ChangeNotifier {
 
   String get thisMonday => ymd(Schedule.mondayOf(DateTime.now()));
 
-  /// Le sprint d'une tâche ; un sprint passé ne compte plus, la tâche retourne au backlog.
-  String? sprintOf(Task t) =>
-      (t.sprint != null && t.sprint!.compareTo(thisMonday) >= 0) ? t.sprint : null;
+  bool closed(String s) => schedule.closures[s]?['closedAt'] != null;
 
-  /// Sprints en cours et à venir.
-  List<String> get sprints =>
-      schedule.sprints.where((s) => s.compareTo(thisMonday) >= 0).toSet().toList()..sort();
+  /// Le sprint en cours : celui de la semaine, ou le suivant une fois celui-ci clôturé.
+  String get current {
+    var m = Schedule.mondayOf(DateTime.now());
+    while (closed(ymd(m))) {
+      m = DateTime(m.year, m.month, m.day + 7);
+    }
+    return ymd(m);
+  }
+
+  /// Un sprint passé reste ouvert tant qu'il n'est pas clôturé : rien n'est reporté tout seul.
+  bool _late(String s) =>
+      s.compareTo(thisMonday) < 0 &&
+      !closed(s) &&
+      schedule.sprints.contains(s) &&
+      tasks.any((t) => !t.deleted && t.sprint == s);
+
+  /// Le sprint d'une tâche ; une fois le sprint clôturé, elle n'y est plus rangée.
+  String? sprintOf(Task t) {
+    final s = t.sprint;
+    if (s == null || closed(s)) return null;
+    return s.compareTo(thisMonday) >= 0 || _late(s) ? s : null;
+  }
+
+  /// Sprints à clôturer, en cours et à venir.
+  List<String> get sprints => schedule.sprints
+      .where((s) => !closed(s) && (s.compareTo(thisMonday) >= 0 || _late(s)))
+      .toSet()
+      .toList()
+    ..sort();
+
+  /// Sprints clôturés, le plus récent d'abord.
+  List<String> get closedSprints =>
+      schedule.closures.keys.where(closed).toList()..sort((a, b) => b.compareTo(a));
+
+  String nextSprint(String s) {
+    var m = dateOf(s);
+    do {
+      m = DateTime(m.year, m.month, m.day + 7);
+    } while (closed(ymd(m)));
+    return ymd(m);
+  }
+
+  /// Catégories de points du bilan (les deux types de vidéo comptent ensemble).
+  static const bilanCats = ['Rue', 'Vidéo', 'Short', 'Rangement', 'Échauffement'];
+  static String bilanCat(Task t) => switch (t.kindOf) {
+        'rue' => 'Rue',
+        'paris' || 'montee' => 'Vidéo',
+        'short' => 'Short',
+        'rangement' => 'Rangement',
+        'echauffement' => 'Échauffement',
+        _ => '',
+      };
+
+  /// Tâches d'un sprint : terminées pour de bon, et les autres (ouvertes, ou cochées
+  /// alors qu'il reste des sous-tâches).
+  List<Task> sprintComplete(String s) =>
+      tasks.where((t) => !t.deleted && t.sprint == s && t.complete).toList()..sort(_order);
+  List<Task> sprintUnfinished(String s) => tasks
+      .where((t) => !t.deleted && t.sprint == s && !t.complete && t.status != 'dropped')
+      .toList()
+    ..sort(_order);
+
+  /// Le bilan d'un sprint tel qu'il serait figé avec ces choix (tâche → report | parking | drop).
+  /// Pas de points partiels : seule une tâche terminée pour de bon rapporte.
+  Map<String, dynamic> closureDraft(String s, Map<String, String> choices) {
+    final done = sprintComplete(s);
+    final rest = sprintUnfinished(s);
+    final byCat = {for (final c in bilanCats) c: 0};
+    for (final t in done) {
+      final c = bilanCat(t);
+      if (c.isNotEmpty) byCat[c] = byCat[c]! + plannedOf(t);
+    }
+    List<Map<String, dynamic>> pick(String what) => [
+          for (final t in rest)
+            if (choices[t.id] == what) {'id': t.id, 'title': t.title}
+        ];
+    final points = byCat.values.fold(0, (a, b) => a + b);
+    return {
+      'target': targetOf(s),
+      'points': points,
+      'byCat': byCat,
+      'done': [
+        for (final t in done)
+          {'id': t.id, 'title': t.title, 'points': plannedOf(t), if (t.result.isNotEmpty) 'result': t.result}
+      ],
+      'carried': pick('report'),
+      'parked': pick('parking'),
+      'dropped': pick('drop'),
+    };
+  }
+
+  /// Clôture : fige le bilan, applique le choix fait pour chaque tâche non terminée,
+  /// crée le sprint suivant s'il manque.
+  void closeSprint(String s, Map<String, String> choices, Map<String, int> prios,
+      {String keep = '', String decisions = ''}) {
+    final rest = sprintUnfinished(s);
+    if (closed(s) || rest.any((t) => !choices.containsKey(t.id))) return;
+    final now = nowMs();
+    final next = nextSprint(s);
+    final bilan = closureDraft(s, choices);
+    for (final t in rest) {
+      switch (choices[t.id]) {
+        case 'report':
+          t.sprint = next;
+          t.priority = (prios[t.id] ?? t.priority).clamp(0, 4);
+          t.meta['reports'] = t.reports + 1;
+          t.meta['reporteDe'] = s;
+          // Cochée sans ses sous-tâches : elle redevient à faire dans le sprint suivant.
+          if (t.status == 'done') {
+            t.status = 'todo';
+            t.doneAt = null;
+            t.archived = false;
+          }
+        case 'parking':
+          t.domain = 'Parking';
+          t.priority = 4;
+          t.sprint = null;
+          t.pickedOn = null;
+          t.call = false;
+          if (t.status == 'done') {
+            t.status = 'todo';
+            t.doneAt = null;
+            t.archived = false;
+          }
+        default:
+          t.status = 'dropped';
+          t.archived = true;
+          t.pickedOn = null;
+      }
+      t.updatedAt = now;
+    }
+    if (!schedule.sprints.contains(next)) schedule.sprints.add(next);
+    schedule.closures[s] = {
+      ...bilan,
+      'closedAt': now,
+      'at': now,
+      'next': next,
+      'keep': keep.trim(),
+      'decisions': decisions.trim(),
+    };
+    _saveSchedule();
+  }
+
+  /// Rouvre un sprint clôturé : son bilan n'est plus figé. Les tâches reportées,
+  /// mises au parking ou abandonnées restent où la clôture les a mises.
+  void reopenSprint(String s) {
+    if (!closed(s)) return;
+    schedule.closures[s] = {'reopenedAt': nowMs(), 'at': nowMs()};
+    _saveSchedule();
+  }
 
   List<Task> sprintTasks(String s) =>
       backlog.where((t) => !t.parked && sprintOf(t) == s).toList();
@@ -248,7 +393,7 @@ class Store extends ChangeNotifier {
   /// puis le reste du sprint en cours par priorité.
   List<Task> get queue {
     final out = <Task>[...calls, ...todayTodo.where((t) => !t.call)];
-    for (final t in sprintTasks(thisMonday)) {
+    for (final t in sprintTasks(current)) {
       if (!out.contains(t)) out.add(t);
     }
     return out;
@@ -357,7 +502,7 @@ class Store extends ChangeNotifier {
   /// Note du sprint en cours sur 100 : part des points engagés déjà gagnés.
   /// Finir un P0 de Mission pèse donc bien plus que finir un P4. Nul sans sprint.
   int? get sprintGrade {
-    final s = thisMonday;
+    final s = current;
     var done = 0.0, all = 0.0;
     for (final t in tasks) {
       if (t.deleted || t.sprint != s || t.parked) continue;
@@ -560,7 +705,7 @@ class Store extends ChangeNotifier {
 
   /// « Il manque 12 points, soit 4 blocs de rue. », vide si la cible est atteinte.
   String get gapText {
-    final gap = targetOf(thisMonday) - valueWeek;
+    final gap = targetOf(current) - valueWeek;
     if (gap <= 0) return '';
     final c = schedule.coef['rue'] ?? 0;
     final n = c > 0 ? (gap / c).ceil() : 0;
@@ -591,6 +736,7 @@ class Store extends ChangeNotifier {
   }
 
   void setTarget(String sprint, int v) {
+    if (closed(sprint)) return;
     schedule.targets[sprint] = v.clamp(0, 500);
     _saveSchedule();
   }
@@ -786,6 +932,13 @@ class Store extends ChangeNotifier {
       targetKids: pts.targetKids,
       targetFree: pts.targetFree,
       spent: {...l.spent, ...r.spent}.toList()..sort(), // une dépense n'est jamais perdue
+      // Clôtures : réunies ; pour un même sprint, la décision la plus récente l'emporte.
+      closures: {
+        ...l.closures,
+        for (final e in r.closures.entries)
+          if (((e.value['at'] ?? 0) as num) >= ((l.closures[e.key]?['at'] ?? 0) as num))
+            e.key: e.value,
+      },
     );
   }
 

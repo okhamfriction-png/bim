@@ -106,7 +106,7 @@ class Task {
   String source; // conversation ou agent qui a créé la tâche
   List<String> links; // liens, vidéos, images
   double rank;
-  String status; // todo | done
+  String status; // todo | done | dropped (abandonnée à une clôture : gardée, plus affichée)
   int createdAt;
   int updatedAt;
   int? doneAt;
@@ -205,6 +205,13 @@ class Task {
   int get catRank => cats.indexOf(cat);
   bool get parked => cat == 'Parking';
   bool get open => !deleted && status == 'todo';
+
+  /// Terminée pour de bon : cochée, et toutes ses sous-tâches aussi.
+  bool get complete => status == 'done' && subs.every((s) => s.done);
+
+  /// Reports d'un sprint au suivant, décidés à la clôture.
+  int get reports => (meta['reports'] as num?)?.toInt() ?? 0;
+  String? get reportedFrom => meta['reporteDe'] as String?;
   int get subsDone => subs.where((s) => s.done).length;
   String get progress => '$subsDone/${subs.length}';
 
@@ -320,6 +327,10 @@ class Schedule {
   List<int> spent; // jetons bonus dépensés : l'instant de chaque dépense (ms)
   bool hasPoints; // faux si le fichier lu ne connaissait pas encore les points
 
+  /// Sprints clôturés : lundi → bilan figé (`closedAt`, cible, points, listes, textes).
+  /// Un sprint rouvert ne garde que `reopenedAt`. `at` date la dernière décision.
+  Map<String, Map<String, dynamic>> closures;
+
   Schedule({
     this.updatedAt = 0,
     this.anchor = '2026-01-05',
@@ -338,7 +349,9 @@ class Schedule {
     this.targetFree = 90,
     List<int>? spent,
     this.hasPoints = true,
+    Map<String, Map<String, dynamic>>? closures,
   })  : spent = spent ?? [],
+        closures = closures ?? {},
         coef = {for (final k in kinds.entries) k.key: coef?[k.key] ?? k.value.$3},
         targets = targets ?? {},
         blocks = blocks ?? [],
@@ -371,6 +384,8 @@ class Schedule {
         targetFree: ((j['points']?['free'] ?? 90) as num).toInt(),
         spent: [for (final x in (j['points']?['spent'] ?? []) as List) (x as num).toInt()],
         hasPoints: j['points'] != null,
+        closures: ((j['closures'] ?? {}) as Map)
+            .map((k, v) => MapEntry('$k', Map<String, dynamic>.from(v as Map))),
       );
 
   static Map<String, int> _ints(dynamic v) =>
@@ -399,6 +414,9 @@ class Schedule {
           'free': targetFree,
           'spent': spent.toList()..sort(),
         },
+        if (closures.isNotEmpty)
+          'closures': Map.fromEntries(
+              closures.entries.toList()..sort((a, b) => a.key.compareTo(b.key))),
       };
 
   static DateTime mondayOf(DateTime d) =>

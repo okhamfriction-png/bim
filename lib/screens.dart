@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'cloture.dart';
 import 'defi.dart';
 import 'models.dart';
 import 'store.dart';
@@ -159,7 +160,7 @@ class _NowScreenState extends State<NowScreen> {
                 Pill('Sprint  ${store.sprintGrade} / 100', p.accent),
             ]),
           ),
-          if (store.sprints.contains(store.thisMonday) || store.valueWeek > 0)
+          if (store.sprints.contains(store.current) || store.valueWeek > 0)
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 9, 12, 10),
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -168,7 +169,7 @@ class _NowScreenState extends State<NowScreen> {
                   const SizedBox(width: 9),
                   Expanded(
                     child: Text(
-                        'Valeur  ${store.valueWeek} / ${store.targetOf(store.thisMonday)} pts',
+                        'Valeur  ${store.valueWeek} / ${store.targetOf(store.current)} pts',
                         style: TextStyle(
                             fontSize: 14.5, fontWeight: FontWeight.w800, color: p.ink)),
                   ),
@@ -180,9 +181,9 @@ class _NowScreenState extends State<NowScreen> {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(99),
                   child: LinearProgressIndicator(
-                      value: store.targetOf(store.thisMonday) == 0
+                      value: store.targetOf(store.current) == 0
                           ? 0
-                          : (store.valueWeek / store.targetOf(store.thisMonday)).clamp(0, 1),
+                          : (store.valueWeek / store.targetOf(store.current)).clamp(0, 1),
                       minHeight: 6,
                       backgroundColor: p.line,
                       color: _statusColors['tenu']),
@@ -378,7 +379,7 @@ class _Empty extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
-    final none = !store.sprints.contains(store.thisMonday);
+    final none = !store.sprints.contains(store.current);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
@@ -435,15 +436,16 @@ class _BacklogScreenState extends State<BacklogScreen> {
 
   Widget sprintBox(BuildContext context, String sp) {
     final p = Pal.of(context);
-    final current = sp == store.thisMonday;
+    final current = sp == store.current;
+    final overdue = sp.compareTo(store.current) < 0;
     final open = store.sprintTasks(sp);
     final done = store.sprintDone(sp);
     final total = open.length + done;
     return Panel(
-      accent: current ? p.accent : null,
+      accent: current ? p.accent : (overdue ? prioColors[0] : null),
       header: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         PanelHead(
-          current ? 'Sprint en cours' : 'Sprint à venir',
+          current ? 'Sprint en cours' : (overdue ? 'Sprint à clôturer' : 'Sprint à venir'),
           icon: Icons.flag_rounded,
           color: current ? Color.lerp(p.accent, p.ink, .25) : p.sub,
           subtitle: cap(_range(dateOf(sp))),
@@ -474,6 +476,16 @@ class _BacklogScreenState extends State<BacklogScreen> {
                       ? prioColors[0]
                       : p.sub)),
         ),
+        // Un sprint qui n'a pas commencé ne se clôture pas.
+        if (overdue || (current && sp.compareTo(store.thisMonday) <= 0))
+          Padding(
+            padding: const EdgeInsets.only(top: 10, right: 4),
+            child: FilledButton.icon(
+                onPressed: () => openClose(context, sp),
+                icon: const Icon(Icons.flag_circle_rounded, size: 19),
+                label: const Text('Clôturer le sprint',
+                    style: TextStyle(fontWeight: FontWeight.w800))),
+          ),
       ]),
       children: [
         if (open.isEmpty)
@@ -621,6 +633,7 @@ class _BacklogScreenState extends State<BacklogScreen> {
             ]),
           ),
         ]),
+      if (store.closedSprints.isNotEmpty) ClosedLine(store.closedSprints.first),
       for (final sp in store.sprints) sprintBox(context, sp),
       SectionTitle('HORS SPRINT',
           trailing: Segmented(const {'cat': 'Catégorie', 'source': 'Origine'}, group,
@@ -797,7 +810,7 @@ class SprintSheet extends StatelessWidget {
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
       const SizedBox(height: 8),
       for (final sp in list)
-        row('${sp == store.thisMonday ? 'Sprint en cours' : 'Sprint'} · ${_range(dateOf(sp))}',
+        row('${sp == store.current ? 'Sprint en cours' : 'Sprint'} · ${_range(dateOf(sp))}',
             sp, Icons.flag_rounded),
       if (!arch) row('Backlog, hors sprint', null, Icons.inbox_rounded),
       if (!arch && store.sprints.isEmpty)
@@ -832,6 +845,9 @@ class _TileState extends State<_Tile> {
     final meta = [
       if (store.unitsLabel(t).isNotEmpty) store.unitsLabel(t),
       if (t.call) 'appel ou entretien',
+      if (t.reports > 0 && t.reportedFrom != null)
+        'reportée du sprint du ${dateOf(t.reportedFrom!).day} ${monthNames[dateOf(t.reportedFrom!).month - 1]}'
+            '${t.reports > 1 ? ' (${t.reports} reports)' : ''}',
       if (t.pickedToday && !struck) 'aujourd\'hui',
       t.source.isNotEmpty ? 'via ${t.source}' : t.cat,
     ].join(' · ');
@@ -1808,7 +1824,7 @@ class ReviewPage extends StatelessWidget {
                             color: p.ink)),
                     Padding(
                       padding: const EdgeInsets.only(left: 6, bottom: 6),
-                      child: Text('/ ${store.targetOf(store.thisMonday)} pts',
+                      child: Text('/ ${store.targetOf(store.current)} pts',
                           style: TextStyle(
                               fontSize: 18, fontWeight: FontWeight.w800, color: p.sub)),
                     ),
@@ -1817,9 +1833,9 @@ class ReviewPage extends StatelessWidget {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(99),
                     child: LinearProgressIndicator(
-                        value: store.targetOf(store.thisMonday) == 0
+                        value: store.targetOf(store.current) == 0
                             ? 0
-                            : (store.valueWeek / store.targetOf(store.thisMonday)).clamp(0, 1),
+                            : (store.valueWeek / store.targetOf(store.current)).clamp(0, 1),
                         minHeight: 7,
                         backgroundColor: p.line,
                         color: _statusColors['tenu']),
