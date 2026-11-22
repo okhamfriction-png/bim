@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'consignes.dart';
 import 'courses.dart';
+import 'kpi.dart';
 import 'notes.dart';
 import 'notes_screen.dart';
 import 'screens.dart';
@@ -156,6 +157,11 @@ class _ShellState extends State<Shell> {
                               color: p.onAccent)),
                     ),
                     const Spacer(),
+                    IconButton(
+                      tooltip: 'Tableau de bord',
+                      onPressed: () => openKpi(context),
+                      icon: Icon(Icons.insights_rounded, color: p.sub),
+                    ),
                     if (consignes.all.isNotEmpty)
                       IconButton(
                         tooltip: 'Consignes à l\'agent',

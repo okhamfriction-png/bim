@@ -6,6 +6,7 @@
   } from './lib/store.svelte.js';
   import Cloture from './lib/Cloture.svelte';
   import Historique from './lib/Historique.svelte';
+  import Kpi from './lib/Kpi.svelte';
   import Lanes from './lib/Lanes.svelte';
   import Task from './lib/Task.svelte';
   import Agenda from './lib/Agenda.svelte';
@@ -39,7 +40,7 @@
   const fmtShort = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' });
   const range = (s) => `${fmtShort.format(dateOf(s))} – ${fmtShort.format(addDays(dateOf(s), 6))}`;
   // Onglets : un bloc seul, ou « Tout » pour ceux cochés dans les réglages.
-  const TABS = [['sprint', 'Sprint'], ['backlog', 'Backlog'], ['agenda', 'Agenda'], ['notes', 'Notes']];
+  const TABS = [['sprint', 'Sprint'], ['backlog', 'Backlog'], ['agenda', 'Agenda'], ['notes', 'Notes'], ['kpi', 'KPI']];
   const show = (k) => (app.ui.focus ? app.ui.focus === k : app.ui.blocks[k]);
   const cols = $derived(TABS.filter(([k]) => show(k)).length);
   function focus(k) {
@@ -136,6 +137,13 @@
       <section class="block">
         <div class="head"><div><h2>Agenda</h2><span class="muted">Blocs fixes et dates</span></div></div>
         <Agenda />
+      </section>
+    {/if}
+
+    {#if show('kpi')}
+      <section class="block">
+        <div class="head"><div><h2>Tableau de bord</h2><span class="muted">Ce qui a été fait, ou pas</span></div></div>
+        <Kpi />
       </section>
     {/if}
 

@@ -11,6 +11,7 @@
     ['backlog', 'Backlog', 'Les sprints à venir et les tâches hors sprint'],
     ['agenda', 'Agenda', 'Les blocs fixes et les dates de la semaine'],
     ['notes', 'Notes', 'La liste de courses et le coffre chiffré : codes, mots de passe'],
+    ['kpi', 'Tableau de bord', 'Chiffres clés et courbes : faites, créées, points, délais'],
   ];
   function toggle(k) {
     const b = app.ui.blocks;
