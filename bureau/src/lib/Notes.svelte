@@ -3,6 +3,7 @@
     vault, exists, allNotes, noteCats, NOTE_ICON, createVault, unlock, lock, saveNote, removeNote,
     newNote, newItem, syncNotes,
   } from './notes.svelte.js';
+  import { courses, courseItems, addCourse, toggleCourse, clearCourses, syncCourses } from './courses.svelte.js';
 
   let code = $state('');
   let again = $state('');
@@ -16,6 +17,25 @@
   let shown = $state({}); // id → valeur cachée affichée
   let copied = $state('');
   let quick = $state({}); // id → texte en cours d'ajout à la liste
+  let article = $state('');
+  let fast = $state(''); // note tapée en une ligne
+  let more = $state(false); // options repliées de la fiche
+
+  // Les listes rangées dans la catégorie « Courses » du coffre rejoignent la liste commune.
+  $effect(() => {
+    if (!vault.unlocked) return;
+    for (const n of allNotes().filter((n) => n.cat === 'Courses' && n.items.length)) {
+      for (const i of n.items) if (!i.done) addCourse(i.text);
+      if (!n.body && !n.secret) removeNote(n);
+      else saveNote({ ...$state.snapshot(n), items: [], cat: 'Mémos' });
+    }
+  });
+  function capture(e) {
+    e.preventDefault();
+    if (!fast.trim()) return;
+    saveNote({ ...newNote(cat || 'Mémos'), title: fast.trim() });
+    fast = '';
+  }
 
   const list = $derived(
     allNotes().filter((n) => {
@@ -49,6 +69,7 @@
     fresh = !n;
     otherCat = '';
     line = '';
+    more = editing.items.length > 0 || editing.pinned || !noteCats().includes(editing.cat);
   }
   function addLine() {
     if (!line.trim()) return;
@@ -86,14 +107,30 @@
   }
 </script>
 
+<article class="courses">
+  <div class="title"><span>🛒</span><b>Courses</b><small>{courseItems().filter((i) => !i.done).length || 'Rien'} à acheter</small></div>
+  {#if courses.error}<p class="err pad">{courses.error} <button class="link" onclick={syncCourses}>Réessayer</button></p>{/if}
+  {#each courseItems() as i (i.id)}
+    <label class="item" class:done={i.done}>
+      <input type="checkbox" checked={i.done} onchange={() => toggleCourse(i)} /><span>{i.text}</span>
+    </label>
+  {/each}
+  <form class="row" onsubmit={(e) => { e.preventDefault(); addCourse(article); article = ''; }}>
+    <input class="quick" bind:value={article} placeholder="+ Ajouter un article" />
+    {#if courseItems().some((i) => i.done)}
+      <button type="button" class="mini" onclick={clearCourses}>Retirer les cochés</button>
+    {/if}
+  </form>
+</article>
+
 {#if !vault.unlocked}
   <form class="gate" onsubmit={go}>
     <div class="big">🔒</div>
-    <h3>{exists() ? 'Coffre de notes fermé' : 'Crée ton coffre de notes'}</h3>
+    <h3>{exists() ? 'Tes notes sont sous clé' : 'Crée ton coffre de notes'}</h3>
     <p class="muted">
       {exists()
-        ? "Entre le code du coffre. Il n'est demandé qu'une fois par appareil."
-        : 'Courses, codes de bâtiment, adresses, mots de passe, jetons : tout est chiffré ici avec un code que toi seul connais, puis synchronisé avec le téléphone.'}
+        ? "Entre ton code pour les voir. Il n'est demandé qu'une fois par appareil."
+        : 'Codes de bâtiment, adresses, mots de passe, jetons : tout est chiffré ici avec un code que toi seul connais, puis synchronisé avec le téléphone.'}
     </p>
     <input type="password" bind:value={code} placeholder="Code du coffre" autocomplete="off" />
     {#if !exists()}
@@ -106,11 +143,14 @@
     {/if}
   </form>
 {:else}
-  <div class="bar">
-    <input bind:value={query} placeholder="Chercher dans les notes" />
-    <button class="btn primary" onclick={() => edit(null)}>+ Note</button>
-    <button class="btn" onclick={lock} title="Fermer le coffre sur cet ordinateur">🔓</button>
-  </div>
+  <form class="bar" onsubmit={capture}>
+    <input bind:value={fast} placeholder="Écrire une note, puis Entrée" />
+    <button type="button" class="btn" onclick={() => edit(null)} title="Note détaillée">+ Détaillée</button>
+    <button type="button" class="btn" onclick={lock} title="Fermer le coffre sur cet ordinateur">🔓</button>
+  </form>
+  {#if allNotes().length > 6}
+    <div class="bar search"><input bind:value={query} placeholder="Chercher dans les notes" /></div>
+  {/if}
   {#if vault.sync === 'error'}<p class="err pad">{vault.error} <button class="link" onclick={syncNotes}>Réessayer</button></p>{/if}
   {#if used.length > 1}
     <div class="cats">
@@ -167,30 +207,34 @@
 {#if editing}
   <div class="veil" onclick={() => (editing = null)} role="presentation"></div>
   <div class="panel" role="dialog" aria-label="Note">
-    <input class="h" bind:value={editing.title} placeholder="Titre de la note" />
-    <h4>Catégorie</h4>
-    <div class="cats wrap">
+    <input class="h" bind:value={editing.title} placeholder="Titre" />
+    <textarea rows="4" bind:value={editing.body} placeholder="Le texte de la note (adresse, code de bâtiment…)"></textarea>
+    <div class="cats wrap top">
       {#each noteCats() as c}
         <button class:on={editing.cat === c && !otherCat.trim()} onclick={() => { editing.cat = c; otherCat = ''; }}>{NOTE_ICON[c] ?? '🏷️'} {c}</button>
       {/each}
     </div>
-    <input bind:value={otherCat} placeholder="Ou une nouvelle catégorie" />
-    <h4>Mémo</h4>
-    <textarea rows="4" bind:value={editing.body} placeholder="Adresse, code de bâtiment, étage, ce que tu veux retrouver"></textarea>
-    <h4>Valeur cachée (mot de passe, jeton)</h4>
-    <input type="password" bind:value={editing.secret} autocomplete="new-password" placeholder="Masquée dans la liste, copiable d'un clic" />
-    <h4>Cases à cocher</h4>
-    {#each editing.items as i (i.id)}
-      <div class="row">
-        <input type="checkbox" class="box" bind:checked={i.done} />
-        <input bind:value={i.text} />
-        <button class="mini" onclick={() => (editing.items = editing.items.filter((x) => x !== i))}>✕</button>
-      </div>
-    {/each}
-    <form onsubmit={(e) => { e.preventDefault(); addLine(); }}>
-      <input bind:value={line} placeholder="Ajouter une ligne (Entrée pour enchaîner)" />
-    </form>
-    <label class="item pin"><input type="checkbox" bind:checked={editing.pinned} /><span>Épingler en haut</span></label>
+    {#if ['Mots de passe', 'Jetons'].includes(editing.cat) || editing.secret}
+      <input type="password" bind:value={editing.secret} autocomplete="new-password"
+        placeholder={editing.cat === 'Jetons' ? 'Le jeton (masqué dans la liste)' : 'Le mot de passe (masqué dans la liste)'} />
+    {/if}
+    {#if !more}
+      <button class="link left" onclick={() => (more = true)}>Plus d'options</button>
+    {:else}
+      <h4>Cases à cocher</h4>
+      {#each editing.items as i (i.id)}
+        <div class="row">
+          <input type="checkbox" class="box" bind:checked={i.done} />
+          <input bind:value={i.text} />
+          <button class="mini" onclick={() => (editing.items = editing.items.filter((x) => x !== i))}>✕</button>
+        </div>
+      {/each}
+      <form onsubmit={(e) => { e.preventDefault(); addLine(); }}>
+        <input bind:value={line} placeholder="Ajouter une ligne (Entrée pour enchaîner)" />
+      </form>
+      <input bind:value={otherCat} placeholder="Ranger dans une nouvelle catégorie" />
+      <label class="item pin"><input type="checkbox" bind:checked={editing.pinned} /><span>Épingler en haut</span></label>
+    {/if}
     <div class="actions">
       {#if !fresh}<button class="btn" onclick={del}>Supprimer</button>{/if}
       <span class="grow"></span>
@@ -201,6 +245,10 @@
 {/if}
 
 <style>
+  .courses { margin: 10px 12px 0; }
+  .search { border-top: 0; padding-top: 0; }
+  .top { padding-top: 6px; }
+  .left { align-self: flex-start; color: var(--sub); padding: 6px 0; }
   .gate { display: flex; flex-direction: column; gap: 10px; padding: 26px 22px; align-items: stretch; text-align: center; overflow: auto; }
   .big { font-size: 34px; }
   h3 { margin: 0; font-size: 18px; }

@@ -10,7 +10,7 @@
     ['sprint', 'Sprint en cours', 'Les tâches du sprint, rangées par priorité'],
     ['backlog', 'Backlog', 'Les sprints à venir et les tâches hors sprint'],
     ['agenda', 'Agenda', 'Les blocs fixes et les dates de la semaine'],
-    ['notes', 'Notes', 'Le coffre chiffré : courses, codes, mots de passe'],
+    ['notes', 'Notes', 'La liste de courses et le coffre chiffré : codes, mots de passe'],
   ];
   function toggle(k) {
     const b = app.ui.blocks;

@@ -2,7 +2,8 @@
 // rangé dans notes.json du dépôt privé. Même format que l'appli du téléphone (lib/notes.dart).
 import { app } from './store.svelte.js';
 
-export const NOTE_CATS = ['Courses', 'Codes et adresses', 'Mots de passe', 'Jetons', 'Mémos'];
+// Les courses ont leur propre liste, hors du coffre (courses.svelte.js).
+export const NOTE_CATS = ['Mémos', 'Codes et adresses', 'Mots de passe', 'Jetons'];
 export const NOTE_ICON = { Courses: '🛒', 'Codes et adresses': '📍', 'Mots de passe': '🔑', Jetons: '🎫', Mémos: '📝' };
 const ITER = 150000;
 

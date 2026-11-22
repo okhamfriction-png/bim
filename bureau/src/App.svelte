@@ -110,7 +110,7 @@
 
     {#if app.ui.blocks.notes}
       <section class="block">
-        <div class="head"><div><h2>Notes</h2><span class="muted">Coffre chiffré, partagé avec le téléphone</span></div></div>
+        <div class="head"><div><h2>Notes</h2><span class="muted">Courses et coffre chiffré, partagés avec le téléphone</span></div></div>
         <Notes />
       </section>
     {/if}

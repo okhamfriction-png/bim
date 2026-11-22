@@ -36,7 +36,15 @@ Aucun outil ne supprime. Une tâche se termine ou s'archive avec `bim_modifier_t
 `/register`, `/authorize`, `/token`, `/revoke`, `/connexion` (l'écran du mot de passe).
 Tout autre chemin répond 404.
 
-## Mise en ligne sur le NAS
+## Mise en ligne sur le Mac mini (choix retenu)
+
+1. `./installer-mac.sh https://<hôte>` installe le service (il écoute sur `127.0.0.1:8793`, démarre
+   avec la session et redémarre s'il tombe). Sans adresse, il reste en local.
+2. Mot de passe de l'écran de connexion : `.venv/bin/python -m passerelle init`
+3. Un tunnel rend `https://<hôte>` joignable sur le port 443 et pointe vers `http://127.0.0.1:8793`.
+4. Le Mac doit rester allumé et la session ouverte. L'accès aux données passe par `gh`, déjà connecté.
+
+## Mise en ligne sur le NAS (autre possibilité)
 
 1. Copier le dépôt sur le NAS, puis dans `mcp/` : `cp .env.exemple .env` et remplir
    `URL_PUBLIQUE`, `BIM_TOKEN` (jeton GitHub limité à `bim-data`, Contents en lecture et écriture).

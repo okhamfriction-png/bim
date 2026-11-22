@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'consignes.dart';
+import 'courses.dart';
 import 'notes.dart';
 import 'notes_screen.dart';
 import 'screens.dart';
@@ -12,6 +13,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await store.load();
   await notes.load();
+  await courses.load();
   consignes.start();
   runApp(const BimApp());
 }
@@ -117,6 +119,7 @@ class _ShellState extends State<Shell> {
       store.loadWidgetConfig();
       store.sync();
       notes.sync();
+      courses.sync();
       consignes.refresh();
     });
   }

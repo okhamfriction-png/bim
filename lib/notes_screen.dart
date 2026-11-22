@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'courses.dart';
 import 'notes.dart';
 import 'store.dart';
 import 'ui.dart';
@@ -19,6 +20,8 @@ const _catColors = <String, Color>{
   'Jetons': Color(0xFFF97316),
   'Mémos': Color(0xFFA855F7),
 };
+/// Catégories où l'on range une valeur à masquer.
+const secretCats = ['Mots de passe', 'Jetons'];
 IconData _iconOf(String c) => _catIcons[c] ?? Icons.label_rounded;
 Color _colorOf(String c) => _catColors[c] ?? const Color(0xFF667085);
 
@@ -45,13 +48,29 @@ class NotesScreen extends StatefulWidget {
 class _NotesScreenState extends State<NotesScreen> {
   String cat = '';
   String query = '';
+  final quick = TextEditingController();
+  final quickFocus = FocusNode();
+
+  /// Une ligne tapée, Entrée : la note existe. Le reste se règle en l'ouvrant.
+  void capture() {
+    final s = quick.text.trim();
+    if (s.isEmpty) return;
+    notes.save(Note(title: s, cat: cat.isEmpty ? 'Mémos' : cat));
+    quick.clear();
+    quickFocus.requestFocus();
+  }
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
         listenable: notes,
         builder: (context, _) {
-          if (!notes.unlocked) return _Gate(create: !notes.exists);
           final p = Pal.of(context);
+          if (!notes.unlocked) {
+            return ListView(padding: const EdgeInsets.only(bottom: 24), children: [
+              const CoursesPanel(),
+              _Gate(create: !notes.exists),
+            ]);
+          }
           final q = query.toLowerCase();
           final all = notes.all;
           final shown = [
@@ -65,27 +84,23 @@ class _NotesScreenState extends State<NotesScreen> {
           ];
           final used = [for (final c in notes.cats) if (all.any((n) => n.cat == c)) c];
           return ListView(padding: const EdgeInsets.only(bottom: 24), children: [
+            const CoursesPanel(),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 8, 6),
+              padding: const EdgeInsets.fromLTRB(16, 8, 8, 6),
               child: Row(children: [
                 Expanded(
                   child: TextField(
-                    onChanged: (v) => setState(() => query = v),
+                    controller: quick,
+                    focusNode: quickFocus,
+                    textCapitalization: TextCapitalization.sentences,
+                    onSubmitted: (_) => capture(),
                     decoration: InputDecoration(
-                        hintText: 'Chercher dans les notes',
+                        hintText: 'Écrire une note',
                         isDense: true,
-                        prefixIcon: Icon(Icons.search_rounded, color: p.sub),
+                        prefixIcon: Icon(Icons.edit_note_rounded, color: p.sub),
                         hintStyle: TextStyle(color: p.sub)),
                   ),
                 ),
-                IconButton(
-                    tooltip: notes.state == 'error' ? notes.error : 'Synchroniser',
-                    onPressed: notes.sync,
-                    icon: Icon(
-                        notes.state == 'error'
-                            ? Icons.cloud_off_rounded
-                            : Icons.cloud_done_rounded,
-                        color: notes.state == 'error' ? prioColors[0] : p.sub)),
                 IconButton(
                     tooltip: 'Fermer le coffre',
                     onPressed: notes.lock,
@@ -112,17 +127,20 @@ class _NotesScreenState extends State<NotesScreen> {
                     ),
                 ]),
               ),
-            if (all.isEmpty)
+            // La recherche n'apparaît que quand il y a de quoi chercher.
+            if (all.length > 6)
               Padding(
-                padding: const EdgeInsets.all(40),
-                child: Column(children: [
-                  Icon(Icons.sticky_note_2_rounded, size: 44, color: p.sub),
-                  const SizedBox(height: 12),
-                  Text('Aucune note pour l\'instant.\nAppuie sur + en haut pour en créer une.',
-                      textAlign: TextAlign.center, style: TextStyle(color: p.sub, fontSize: 15)),
-                ]),
-              )
-            else if (shown.isEmpty)
+                padding: const EdgeInsets.fromLTRB(16, 2, 16, 4),
+                child: TextField(
+                  onChanged: (v) => setState(() => query = v),
+                  decoration: InputDecoration(
+                      hintText: 'Chercher dans les notes',
+                      isDense: true,
+                      prefixIcon: Icon(Icons.search_rounded, color: p.sub),
+                      hintStyle: TextStyle(color: p.sub)),
+                ),
+              ),
+            if (all.isNotEmpty && shown.isEmpty)
               Padding(
                 padding: const EdgeInsets.all(40),
                 child: Text('Rien ne correspond.',
@@ -168,18 +186,20 @@ class _GateState extends State<_Gate> {
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final create = widget.create;
-    return ListView(padding: const EdgeInsets.fromLTRB(24, 30, 24, 24), children: [
-      Icon(Icons.lock_rounded, size: 46, color: p.accent),
+    return Padding(
+        padding: const EdgeInsets.fromLTRB(24, 26, 24, 24),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Icon(Icons.lock_rounded, size: 40, color: p.accent),
       const SizedBox(height: 14),
-      Text(create ? 'Crée ton coffre de notes' : 'Coffre de notes fermé',
+      Text(create ? 'Crée ton coffre de notes' : 'Tes notes sont sous clé',
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800)),
       const SizedBox(height: 10),
       Text(
           create
-              ? 'Courses, codes de bâtiment, adresses, mots de passe, jetons : tout est chiffré sur '
+              ? 'Codes de bâtiment, adresses, mots de passe, jetons : tout est chiffré sur '
                   'ton appareil avec un code que toi seul connais, puis synchronisé entre le téléphone et le PC.'
-              : 'Entre le code du coffre. Il n\'est demandé qu\'une fois par appareil.',
+              : 'Entre ton code pour les voir. Il n\'est demandé qu\'une fois par appareil.',
           textAlign: TextAlign.center,
           style: TextStyle(color: p.sub, fontSize: 15, height: 1.35)),
       const SizedBox(height: 22),
@@ -233,7 +253,7 @@ class _GateState extends State<_Gate> {
                 style: TextStyle(color: prioColors[1], fontSize: 13.5, height: 1.35)),
           ),
       ],
-    ]);
+    ]));
   }
 }
 
@@ -409,6 +429,8 @@ class _NoteSheetState extends State<NoteSheet> {
     for (final i in widget.note?.items ?? <NoteItem>[]) NoteItem(i.text, id: i.id, done: i.done)
   ];
   bool showSecret = false;
+  // Le reste (cases à cocher, autre catégorie, épingle) reste replié tant qu'on n'en a pas besoin.
+  late bool more = items.isNotEmpty || pinned || !noteCats.contains(cat);
 
   void addItem() {
     final s = add.text.trim();
@@ -447,9 +469,19 @@ class _NoteSheetState extends State<NoteSheet> {
         textCapitalization: TextCapitalization.sentences,
         style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
         decoration: InputDecoration(
-            hintText: 'Titre de la note', border: InputBorder.none, hintStyle: TextStyle(color: p.sub)),
+            hintText: 'Titre', border: InputBorder.none, hintStyle: TextStyle(color: p.sub)),
       ),
-      _label(context, 'CATÉGORIE'),
+      TextField(
+        controller: body,
+        minLines: 2,
+        maxLines: 12,
+        textCapitalization: TextCapitalization.sentences,
+        decoration: InputDecoration(
+            hintText: 'Le texte de la note (adresse, code de bâtiment…)',
+            isDense: true,
+            hintStyle: TextStyle(color: p.sub)),
+      ),
+      const SizedBox(height: 14),
       Wrap(spacing: 8, runSpacing: 8, children: [
         for (final c in notes.cats)
           Pick(c, cat == c && other.text.trim().isEmpty, () => setState(() {
@@ -457,69 +489,73 @@ class _NoteSheetState extends State<NoteSheet> {
                 other.clear();
               }), color: _colorOf(c), icon: _iconOf(c)),
       ]),
-      TextField(
-        controller: other,
-        textCapitalization: TextCapitalization.sentences,
-        onChanged: (_) => setState(() {}),
-        decoration: InputDecoration(
-            hintText: 'Ou une nouvelle catégorie', isDense: true, hintStyle: TextStyle(color: p.sub)),
-      ),
-      _label(context, 'MÉMO'),
-      TextField(
-        controller: body,
-        minLines: 2,
-        maxLines: 12,
-        textCapitalization: TextCapitalization.sentences,
-        decoration: InputDecoration(
-            hintText: 'Adresse, code de bâtiment, étage, ce que tu veux retrouver',
-            isDense: true,
-            hintStyle: TextStyle(color: p.sub)),
-      ),
-      _label(context, 'VALEUR CACHÉE (MOT DE PASSE, JETON)'),
-      TextField(
-        controller: secret,
-        obscureText: !showSecret,
-        autocorrect: false,
-        enableSuggestions: false,
-        decoration: InputDecoration(
-            hintText: 'Masquée dans la liste, copiable d\'un appui',
-            isDense: true,
-            hintStyle: TextStyle(color: p.sub),
-            suffixIcon: IconButton(
-                onPressed: () => setState(() => showSecret = !showSecret),
+      if (secretCats.contains(cat) || secret.text.isNotEmpty) ...[
+        const SizedBox(height: 14),
+        TextField(
+          controller: secret,
+          obscureText: !showSecret,
+          autocorrect: false,
+          enableSuggestions: false,
+          decoration: InputDecoration(
+              hintText: cat == 'Jetons' ? 'Le jeton (masqué dans la liste)' : 'Le mot de passe (masqué dans la liste)',
+              isDense: true,
+              hintStyle: TextStyle(color: p.sub),
+              suffixIcon: IconButton(
+                  onPressed: () => setState(() => showSecret = !showSecret),
+                  icon: Icon(
+                      showSecret ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                      size: 20))),
+        ),
+      ],
+      if (!more)
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+              onPressed: () => setState(() => more = true),
+              icon: const Icon(Icons.expand_more_rounded),
+              label: const Text('Plus d\'options')),
+        )
+      else ...[
+        _label(context, 'CASES À COCHER'),
+        for (final i in items)
+          Row(children: [
+            IconButton(
+                visualDensity: VisualDensity.compact,
+                onPressed: () => setState(() => i.done = !i.done),
                 icon: Icon(
-                    showSecret ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                    size: 20))),
-      ),
-      _label(context, 'CASES À COCHER'),
-      for (final i in items)
-        Row(children: [
-          IconButton(
-              visualDensity: VisualDensity.compact,
-              onPressed: () => setState(() => i.done = !i.done),
-              icon: Icon(
-                  i.done ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
-                  color: i.done ? const Color(0xFF22C55E) : p.sub)),
-          Expanded(child: Text(i.text, style: const TextStyle(fontSize: 15))),
-          IconButton(
-              tooltip: 'Retirer',
-              visualDensity: VisualDensity.compact,
-              onPressed: () => setState(() => items.remove(i)),
-              icon: Icon(Icons.close_rounded, size: 19, color: p.sub)),
-        ]),
-      TextField(
-        controller: add,
-        focusNode: addFocus,
-        textCapitalization: TextCapitalization.sentences,
-        decoration: InputDecoration(
-            hintText: 'Ajouter une ligne (Entrée pour enchaîner)',
-            isDense: true,
-            hintStyle: TextStyle(color: p.sub)),
-        onSubmitted: (_) => addItem(),
-      ),
-      const SizedBox(height: 14),
-      Pick('Épingler en haut', pinned, () => setState(() => pinned = !pinned),
-          icon: Icons.push_pin_rounded),
+                    i.done ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+                    color: i.done ? const Color(0xFF22C55E) : p.sub)),
+            Expanded(child: Text(i.text, style: const TextStyle(fontSize: 15))),
+            IconButton(
+                tooltip: 'Retirer',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => setState(() => items.remove(i)),
+                icon: Icon(Icons.close_rounded, size: 19, color: p.sub)),
+          ]),
+        TextField(
+          controller: add,
+          focusNode: addFocus,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: InputDecoration(
+              hintText: 'Ajouter une ligne (Entrée pour enchaîner)',
+              isDense: true,
+              hintStyle: TextStyle(color: p.sub)),
+          onSubmitted: (_) => addItem(),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: other,
+          textCapitalization: TextCapitalization.sentences,
+          onChanged: (_) => setState(() {}),
+          decoration: InputDecoration(
+              hintText: 'Ranger dans une nouvelle catégorie',
+              isDense: true,
+              hintStyle: TextStyle(color: p.sub)),
+        ),
+        const SizedBox(height: 14),
+        Pick('Épingler en haut', pinned, () => setState(() => pinned = !pinned),
+            icon: Icons.push_pin_rounded),
+      ],
       const SizedBox(height: 22),
       Row(children: [
         if (n != null)

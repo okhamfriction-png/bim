@@ -10,8 +10,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'models.dart';
 import 'store.dart';
 
-/// Catégories proposées d'office ; on peut en taper d'autres.
-const noteCats = ['Courses', 'Codes et adresses', 'Mots de passe', 'Jetons', 'Mémos'];
+/// Catégories proposées d'office ; on peut en taper d'autres. Les courses ont leur propre
+/// liste, hors du coffre (courses.dart).
+const noteCats = ['Mémos', 'Codes et adresses', 'Mots de passe', 'Jetons'];
 
 class NoteItem {
   String id, text;

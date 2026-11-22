@@ -6,6 +6,8 @@
   bim rm <début du titre ou de l'identifiant>
   bim list
   bim done <début du titre ou de l'identifiant>
+  bim courses [article…]        sans article : voir la liste ; avec : les ajouter
+  bim courses --pris <article>  cocher un article
 
 Le backlog est le fichier backlog.json du dépôt GitHub privé <compte>/bim-data
 (ou celui de la variable BIM_REPO). L'accès passe par `gh`, déjà connecté ; sur une machine
@@ -83,6 +85,7 @@ def repo():
 EMPTY = {
     "backlog.json": lambda: {"version": 1, "tasks": [], "schedule": {}},
     "consignes.json": lambda: {"v": 1, "consignes": []},
+    "courses.json": lambda: {"v": 1, "items": []},
 }
 
 
@@ -276,6 +279,59 @@ def cmd_rm(a):
                  else "Plusieurs tâches correspondent :\n" + "\n".join(f"  {t['id']}  {t['title']}" for t in hits))
 
 
+def courses_add(doc, names):
+    """Ajoute des articles à la liste de courses ; renvoie (ajoutés, déjà présents)."""
+    items = doc.setdefault("items", [])
+    added, known = [], []
+    for name in names:
+        name = name.strip()
+        if not name:
+            continue
+        same = [i for i in items if not i.get("deleted") and i["text"].strip().lower() == name.lower()]
+        if same and not all(i.get("done") for i in same):
+            known.append(name)
+            continue
+        if same:  # déjà pris la dernière fois : on le remet à acheter
+            same[0]["done"] = False
+            same[0]["updatedAt"] = now_ms()
+        else:
+            items.append({"id": new_id(), "text": name[:1].upper() + name[1:], "done": False,
+                          "updatedAt": now_ms()})
+        added.append(name)
+    return added, known
+
+
+def cmd_courses(a):
+    if a.pris:
+        key = a.pris.strip().lower()
+
+        def fn(doc):
+            hits = [i for i in doc.get("items", []) if not i.get("deleted") and not i.get("done")
+                    and i["text"].lower().startswith(key)]
+            if len(hits) == 1:
+                hits[0]["done"] = True
+                hits[0]["updatedAt"] = now_ms()
+            return hits
+
+        hits = change(fn, "bim : courses", "courses.json")
+        if len(hits) != 1:
+            sys.exit("Aucun article trouvé." if not hits else "Plusieurs articles correspondent : "
+                     + ", ".join(i["text"] for i in hits))
+        print(f"Pris : {hits[0]['text']}")
+    if a.articles:
+        added, known = change(lambda doc: courses_add(doc, a.articles), "bim : courses", "courses.json")
+        if added:
+            print("Ajouté aux courses : " + ", ".join(added))
+        if known:
+            print("Déjà dans la liste : " + ", ".join(known))
+    if not a.pris and not a.articles:
+        items = [i for i in read("courses.json").get("items", []) if not i.get("deleted")]
+        if not items:
+            print("Liste de courses vide.")
+        for i in sorted(items, key=lambda i: bool(i.get("done"))):
+            print(("[x] " if i.get("done") else "[ ] ") + i["text"])
+
+
 def main():
     p = argparse.ArgumentParser(prog="bim", description="Backlog Bim")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -301,6 +357,10 @@ def main():
     r = sub.add_parser("rm", help="supprimer une tâche")
     r.add_argument("key")
     r.set_defaults(fn=cmd_rm)
+    c = sub.add_parser("courses", help="liste de courses : voir, ajouter, cocher")
+    c.add_argument("articles", nargs="*")
+    c.add_argument("--pris", help="cocher l'article qui commence ainsi")
+    c.set_defaults(fn=cmd_courses)
     args = p.parse_args()
     try:
         args.fn(args)
