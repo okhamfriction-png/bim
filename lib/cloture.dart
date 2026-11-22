@@ -65,6 +65,10 @@ class _ClosePageState extends State<ClosePage> {
           final p = Pal.of(context);
           final done = store.sprintComplete(sp);
           final rest = store.sprintUnfinished(sp);
+          // Par défaut, tout ce qui n'est pas terminé est reporté ; chaque choix se change.
+          for (final t in rest) {
+            choices.putIfAbsent(t.id, () => 'report');
+          }
           final chosen = rest.where((t) => choices.containsKey(t.id)).length;
           final ready = chosen == rest.length;
           const titles = ['Terminé', 'Non terminé', 'Bilan'];
@@ -213,8 +217,8 @@ class _ClosePageState extends State<ClosePage> {
           context,
           rest.isEmpty
               ? 'Tout est terminé : rien à décider.'
-              : 'Pour chaque tâche, choisis ce qu\'elle devient. Rien n\'est reporté tout seul. '
-                  'Sprint suivant : ${sprintRange(next)}. Décidées : $chosen sur ${rest.length}.'),
+              : 'Tout est reporté au sprint suivant (${sprintRange(next)}) par défaut. '
+                  'Change ce qui doit aller au parking ou être abandonné.'),
       for (final t in rest)
         Panel(
           accent: choices.containsKey(t.id) ? null : p.accent,

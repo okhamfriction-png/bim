@@ -20,6 +20,10 @@
   const rest = $derived(sprintUnfinished(sprint));
   const chosen = $derived(rest.filter((t) => choices[t.id]).length);
   const ready = $derived(chosen === rest.length);
+  // Par défaut, tout ce qui n'est pas terminé est reporté ; chaque choix se change.
+  $effect(() => {
+    for (const t of rest) if (!choices[t.id]) choices[t.id] = 'report';
+  });
   const TITLES = ['Terminé', 'Non terminé', 'Bilan'];
   const CHOICES = [
     ['report', '↪ Reporter au sprint suivant'],
@@ -67,7 +71,7 @@
     {:else if step === 1}
       <p class="muted">
         {rest.length
-          ? `Pour chaque tâche, choisis ce qu'elle devient. Rien n'est reporté tout seul. Sprint suivant : ${range(nextSprint(sprint))}. Décidées : ${chosen} sur ${rest.length}.`
+          ? `Tout est reporté au sprint suivant (${range(nextSprint(sprint))}) par défaut. Change ce qui doit aller au parking ou être abandonné.`
           : 'Tout est terminé : rien à décider.'}
       </p>
       {#each rest as t (t.id)}
