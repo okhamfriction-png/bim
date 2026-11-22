@@ -468,6 +468,7 @@ class _BacklogScreenState extends State<BacklogScreen> {
           child: Text(
               'Prévu ${store.plannedIn(sp)} pts · cible ${store.targetOf(sp)}'
               '${store.plannedIn(sp) < store.targetOf(sp) ? ' · sous la cible' : ''}'
+              '${store.velocityLabel.isEmpty ? '' : ' · ${store.velocityLabel}'}'
               '${store.p0In(sp) > 3 ? ' · ${store.p0In(sp)} P0 (3 max)' : ''}',
               style: TextStyle(
                   fontSize: 12.5,
@@ -1814,8 +1815,28 @@ class ReviewPage extends StatelessWidget {
                       style: TextStyle(
                           fontSize: 54, height: 1, fontWeight: FontWeight.w900, color: p.ink)),
                   if (warmups().isNotEmpty) ...[h('ÉCHAUFFEMENT'), const DefiReview()],
-                  h('POINTS DE VALEUR'),
-                  Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  if (store.closed(store.thisMonday)) ...[
+                    h('BILAN DE CLÔTURE DU SPRINT'),
+                    ClosedDetail(store.thisMonday, margin: const EdgeInsets.symmetric(vertical: 5)),
+                  ] else if (store.sprints.contains(store.thisMonday)) ...[
+                    h('BILAN DU SPRINT'),
+                    Text('Le sprint n\'est pas clôturé : les chiffres ci-dessous sont provisoires.',
+                        style: TextStyle(color: p.sub)),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: FilledButton.icon(
+                          onPressed: () => openClose(context, store.thisMonday),
+                          icon: const Icon(Icons.flag_circle_rounded, size: 19),
+                          label: const Text('Clôturer le sprint',
+                              style: TextStyle(fontWeight: FontWeight.w800))),
+                    ),
+                  ],
+                  h(store.closed(store.thisMonday)
+                      ? 'UNITÉS LIVRÉES CETTE SEMAINE'
+                      : 'POINTS DE VALEUR'),
+                  if (!store.closed(store.thisMonday))
+                    Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
                     Text('${store.valueWeek}',
                         style: TextStyle(
                             fontSize: 54,
@@ -1830,7 +1851,8 @@ class ReviewPage extends StatelessWidget {
                     ),
                   ]),
                   const SizedBox(height: 10),
-                  ClipRRect(
+                  if (!store.closed(store.thisMonday))
+                    ClipRRect(
                     borderRadius: BorderRadius.circular(99),
                     child: LinearProgressIndicator(
                         value: store.targetOf(store.current) == 0
@@ -1857,8 +1879,8 @@ class ReviewPage extends StatelessWidget {
                     ),
                   const SizedBox(height: 8),
                   Text(
-                      'Demandes de rue : ${(store.weekUnits['rue'] ?? 0) * askPerBlock}.  '
-                      '${store.gapText.isEmpty ? 'Cible atteinte.' : store.gapText}',
+                      'Demandes de rue : ${(store.weekUnits['rue'] ?? 0) * askPerBlock}.'
+                      '${store.closed(store.thisMonday) ? '' : '  ${store.gapText.isEmpty ? 'Cible atteinte.' : store.gapText}'}',
                       style: TextStyle(
                           color: p.ink, fontSize: 14.5, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 10),

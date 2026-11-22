@@ -250,6 +250,24 @@ class Store extends ChangeNotifier {
   List<String> get closedSprints =>
       schedule.closures.keys.where(closed).toList()..sort((a, b) => b.compareTo(a));
 
+  int closedPoints(String s) => ((schedule.closures[s]?['points'] ?? 0) as num).toInt();
+
+  /// Vélocité : moyenne des points faits sur les 3 derniers sprints clôturés (null sans clôture).
+  double? get velocity {
+    final last = closedSprints.take(3).toList();
+    if (last.isEmpty) return null;
+    return last.fold(0, (a, s) => a + closedPoints(s)) / last.length;
+  }
+
+  /// « moyenne des 3 derniers sprints : 42 », vide sans sprint clôturé.
+  String get velocityLabel {
+    final v = velocity;
+    if (v == null) return '';
+    final n = closedSprints.take(3).length;
+    final x = v == v.roundToDouble() ? '${v.round()}' : v.toStringAsFixed(1).replaceAll('.', ',');
+    return n == 1 ? 'dernier sprint : $x' : 'moyenne des $n derniers sprints : $x';
+  }
+
   String nextSprint(String s) {
     var m = dateOf(s);
     do {

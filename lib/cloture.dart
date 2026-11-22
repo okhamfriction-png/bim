@@ -329,7 +329,9 @@ class _ClosePageState extends State<ClosePage> {
 class BilanView extends StatelessWidget {
   final String sprint;
   final Map<String, dynamic> b;
-  const BilanView(this.sprint, this.b, {super.key});
+  final EdgeInsetsGeometry margin;
+  const BilanView(this.sprint, this.b,
+      {this.margin = const EdgeInsets.fromLTRB(16, 6, 16, 6), super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -347,7 +349,7 @@ class BilanView extends StatelessWidget {
           ]),
         );
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Panel(children: [
+      Panel(margin: margin, children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -376,10 +378,10 @@ class BilanView extends StatelessWidget {
           ]),
         ),
       ]),
-      Panel(header: const PanelHead('Points par catégorie'), children: [
+      Panel(margin: margin, header: const PanelHead('Points par catégorie'), children: [
         for (final c in Store.bilanCats) line(c, _pts((byCat[c] as num? ?? 0).toInt())),
       ]),
-      Panel(header: const PanelHead('Tâches'), children: [
+      Panel(margin: margin, header: const PanelHead('Tâches'), children: [
         line('Terminées', '${n('done')}', color: const Color(0xFF22C55E)),
         line('Reportées', '${n('carried')}'),
         line('Au parking', '${n('parked')}'),
@@ -405,14 +407,17 @@ class ClosedLine extends StatelessWidget {
           Icon(Icons.lock_rounded, size: 19, color: p.sub),
           const SizedBox(width: 10),
           Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child: InkWell(
+                onTap: () => openHistory(context),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Sprint du ${sprintRange(sprint)} · clôturé',
                   style: const TextStyle(fontWeight: FontWeight.w800)),
               Text(
                   '${b['points']} / ${_pts((b['target'] as num).toInt())} · le ${_when((b['closedAt'] as num).toInt())}',
                   style: TextStyle(fontSize: 12.5, color: p.sub)),
-            ]),
+            ])),
           ),
+          TextButton(onPressed: () => openHistory(context), child: const Text('Historique')),
           TextButton(
               onPressed: () async {
                 final ok = await showDialog<bool>(
@@ -438,4 +443,215 @@ class ClosedLine extends StatelessWidget {
       ),
     ]);
   }
+}
+
+/// Le bilan figé d'un sprint clôturé : chiffres, textes, et ce que chaque tâche est devenue.
+class ClosedDetail extends StatelessWidget {
+  final String sprint;
+  final EdgeInsetsGeometry margin;
+  const ClosedDetail(this.sprint,
+      {this.margin = const EdgeInsets.fromLTRB(16, 6, 16, 6), super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final b = store.schedule.closures[sprint]!;
+    Widget text(String title, String v) =>
+        Panel(margin: margin, header: PanelHead(title), children: [
+          Padding(padding: const EdgeInsets.all(14), child: SelectableText(v)),
+        ]);
+    Widget list(String title, String key, {bool points = false}) {
+      final l = (b[key] as List? ?? []);
+      if (l.isEmpty) return const SizedBox.shrink();
+      return Panel(margin: margin, header: PanelHead(title, count: '${l.length}'), children: [
+        for (final t in l)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('${t['title']}'),
+                  if ('${t['result'] ?? ''}'.isNotEmpty)
+                    Text('${t['result']}', style: TextStyle(fontSize: 12.5, color: p.sub)),
+                ]),
+              ),
+              if (points && ((t['points'] ?? 0) as num) > 0)
+                Text(_pts((t['points'] as num).toInt()),
+                    style: const TextStyle(fontWeight: FontWeight.w800)),
+            ]),
+          ),
+      ]);
+    }
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      BilanView(sprint, b, margin: margin),
+      if ('${b['keep'] ?? ''}'.isNotEmpty) text('Ce que je retiens', '${b['keep']}'),
+      if ('${b['decisions'] ?? ''}'.isNotEmpty)
+        text('Décisions pour le sprint suivant', '${b['decisions']}'),
+      list('Terminées', 'done', points: true),
+      list('Reportées', 'carried'),
+      list('Au parking', 'parked'),
+      list('Abandonnées', 'dropped'),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+        child: Text('Clôturé le ${_when((b['closedAt'] as num).toInt())}.',
+            textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, color: p.sub)),
+      ),
+    ]);
+  }
+}
+
+void openHistory(BuildContext context) =>
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const HistoryPage()));
+
+/// Sprints clôturés : la courbe de vélocité, puis chaque sprint avec son bilan.
+class HistoryPage extends StatefulWidget {
+  const HistoryPage({super.key});
+  @override
+  State<HistoryPage> createState() => _HistoryPageState();
+}
+
+class _HistoryPageState extends State<HistoryPage> {
+  String? open;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+        listenable: store,
+        builder: (context, _) {
+          final p = Pal.of(context);
+          final all = store.closedSprints;
+          open ??= all.firstOrNull;
+          return Scaffold(
+            appBar: AppBar(title: const Text('Sprints clôturés')),
+            body: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 640),
+                child: ListView(padding: const EdgeInsets.only(bottom: 24), children: [
+                  if (all.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(40),
+                      child: Text('Aucun sprint clôturé pour l\'instant.',
+                          textAlign: TextAlign.center, style: TextStyle(color: p.sub)),
+                    )
+                  else
+                    Panel(
+                      header: PanelHead('Vélocité',
+                          icon: Icons.show_chart_rounded,
+                          subtitle: 'Points faits par sprint · ${store.velocityLabel}'),
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 14, 12, 4),
+                          child: SizedBox(
+                            height: 190,
+                            child: CustomPaint(
+                                painter: _Velocity(
+                                    all.take(12).toList().reversed.toList(), store.velocity!, p)),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(14, 6, 14, 10),
+                          child: Text(
+                              'Barre : points faits. Trait gris : cible. Pointillés bleus : moyenne des 3 derniers sprints.',
+                              style: TextStyle(fontSize: 12.5, color: p.sub)),
+                        ),
+                      ],
+                    ),
+                  for (final s in all) ...[
+                    Panel(children: [
+                      InkWell(
+                        onTap: () => setState(() => open = open == s ? '' : s),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+                          child: Row(children: [
+                            Expanded(
+                              child: Text('Sprint du ${sprintRange(s)}',
+                                  style: const TextStyle(
+                                      fontSize: 15.5, fontWeight: FontWeight.w800)),
+                            ),
+                            Text(
+                                '${store.closedPoints(s)} / ${_pts((store.schedule.closures[s]!['target'] as num).toInt())}',
+                                style: const TextStyle(fontWeight: FontWeight.w800)),
+                            Icon(
+                                open == s
+                                    ? Icons.expand_less_rounded
+                                    : Icons.expand_more_rounded,
+                                color: p.sub),
+                          ]),
+                        ),
+                      ),
+                    ]),
+                    if (open == s) ClosedDetail(s),
+                  ],
+                ]),
+              ),
+            ),
+          );
+        },
+      );
+}
+
+/// Une barre par sprint (points faits), un trait pour sa cible, et la moyenne des 3 derniers.
+class _Velocity extends CustomPainter {
+  final List<String> sprints; // du plus ancien au plus récent
+  final double avg;
+  final Pal p;
+  _Velocity(this.sprints, this.avg, this.p);
+
+  void _text(Canvas c, String s, Offset center, Color color, {bool bold = false}) {
+    final t = TextPainter(
+        text: TextSpan(
+            text: s,
+            style: TextStyle(
+                fontSize: 11.5,
+                color: color,
+                fontWeight: bold ? FontWeight.w800 : FontWeight.w500)),
+        textDirection: TextDirection.ltr)
+      ..layout();
+    t.paint(c, center - Offset(t.width / 2, t.height / 2));
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const top = 18.0, bottom = 22.0;
+    final h = size.height - top - bottom;
+    var hi = avg;
+    for (final s in sprints) {
+      final b = store.schedule.closures[s]!;
+      for (final v in [(b['points'] as num).toDouble(), (b['target'] as num).toDouble()]) {
+        if (v > hi) hi = v;
+      }
+    }
+    if (hi <= 0) hi = 1;
+    double y(num v) => top + h - h * v / hi;
+    final slot = size.width / sprints.length;
+    final w = (slot * .55).clamp(8.0, 46.0);
+    canvas.drawLine(Offset(0, y(0)), Offset(size.width, y(0)), Paint()..color = p.line);
+    for (var i = 0; i < sprints.length; i++) {
+      final b = store.schedule.closures[sprints[i]]!;
+      final pts = (b['points'] as num).toDouble(), target = (b['target'] as num).toDouble();
+      final x = slot * (i + .5);
+      canvas.drawRRect(
+          RRect.fromRectAndCorners(Rect.fromLTRB(x - w / 2, y(pts), x + w / 2, y(0)),
+              topLeft: const Radius.circular(5), topRight: const Radius.circular(5)),
+          Paint()..color = pts >= target ? const Color(0xFF22C55E) : p.accent);
+      canvas.drawLine(
+          Offset(x - w / 2 - 4, y(target)),
+          Offset(x + w / 2 + 4, y(target)),
+          Paint()
+            ..color = p.sub
+            ..strokeWidth = 2);
+      _text(canvas, '${pts.round()}', Offset(x, y(pts) - 9), p.ink, bold: true);
+      final d = dateOf(sprints[i]);
+      _text(canvas, '${d.day}/${d.month}', Offset(x, size.height - 8), p.sub);
+    }
+    final dash = Paint()
+      ..color = const Color(0xFF0EA5E9)
+      ..strokeWidth = 2;
+    for (var x = 0.0; x < size.width; x += 10) {
+      canvas.drawLine(Offset(x, y(avg)), Offset(x + 5, y(avg)), dash);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _Velocity old) => true;
 }
