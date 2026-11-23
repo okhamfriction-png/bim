@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
+import 'liaison.dart';
 import 'media_io.dart' if (dart.library.js_interop) 'media_web.dart';
 import 'defi.dart';
 import 'models.dart';
@@ -593,6 +594,29 @@ class _SyncSheetState extends State<SyncSheet> {
         Text(
             'Le backlog vit dans un fichier d\'un dépôt GitHub privé. Le téléphone, le web et tes sessions Claude lisent et écrivent le même.',
             style: TextStyle(color: p.sub)),
+        const SizedBox(height: 14),
+        if (store.linked)
+          OutlinedButton.icon(
+              onPressed: () => sheet(context, const LinkOtherSheet()),
+              icon: const Icon(Icons.qr_code_2_rounded),
+              style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+              label: const Text('Relier un autre appareil',
+                  style: TextStyle(fontWeight: FontWeight.w800)))
+        else ...[
+          FilledButton.icon(
+              onPressed: () async {
+                final nav = Navigator.of(context);
+                if (await sheet<bool>(context, const ReceiveLinkSheet()) == true) nav.pop();
+              },
+              icon: const Icon(Icons.link_rounded),
+              style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+              label: const Text('Relier avec un code de liaison',
+                  style: TextStyle(fontWeight: FontWeight.w800))),
+          const SizedBox(height: 6),
+          Text('Le code se fait sur un appareil déjà relié : Réglages → Relier un autre appareil. '
+              'Ou bien, à la main :',
+              style: TextStyle(color: p.sub, fontSize: 13)),
+        ],
         const SizedBox(height: 14),
         TextField(
             controller: repo,

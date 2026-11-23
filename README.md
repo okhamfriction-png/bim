@@ -12,6 +12,18 @@ Les blocs, repères et dates ponctuelles se règlent dans `backlog.json` (clé `
 
 Appli Flutter (web + Android). Les données vivent dans `backlog.json`, dans un dépôt GitHub privé séparé (`<compte>/bim-data`) ; l'appli y accède avec un jeton GitHub saisi dans l'écran Synchronisation (icône nuage).
 
+## Relier un nouvel appareil
+
+Sur un appareil déjà relié : Réglages → **Relier un autre appareil**. Bim montre un QR code, un lien
+(« Envoyer le lien », « Copier le lien ») et un code court de 6 caractères, valable 15 minutes. Sur le
+nouvel appareil, on scanne le QR code ou on ouvre le lien, puis on tape le code court : Bim est relié,
+et le coffre de notes s'ouvre avec son code habituel. Sans lien, Réglages → Relier avec un code de liaison.
+
+Le lien porte dépôt et jeton chiffrés (AES-256-GCM, clé PBKDF2 tirée du code court), dans le fragment
+`#relier=…` qui ne part jamais vers un serveur ; le jeton ne s'affiche nulle part. Même format côté
+téléphone (`lib/liaison_code.dart`) et bureau (`bureau/src/lib/liaison.js`). Le lien voyage à part,
+le code court se tape à la main.
+
 ## Installer sur Android
 
 Télécharge l'APK : https://github.com/okhamfriction-png/bim/releases/latest/download/bim.apk

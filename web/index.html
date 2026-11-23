@@ -33,7 +33,7 @@
   <script>
     if (location.pathname.indexOf('/bim/') === 0 && innerWidth >= 900 &&
         location.search.indexOf('mobile') < 0) {
-      location.replace('bureau/');
+      location.replace('bureau/' + location.hash);
     }
   </script>
 

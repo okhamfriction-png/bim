@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'courses.dart';
+import 'liaison.dart';
 import 'notes.dart';
 import 'store.dart';
 import 'ui.dart';
@@ -68,7 +69,8 @@ class _NotesScreenState extends State<NotesScreen> {
           if (!notes.unlocked) {
             return ListView(padding: const EdgeInsets.only(bottom: 24), children: [
               const CoursesPanel(),
-              _Gate(create: !notes.exists),
+              // Pas relié : le coffre existe peut-être ailleurs, on n'en crée pas un second.
+              if (!store.linked && !notes.exists) const _LinkFirst() else _Gate(create: !notes.exists),
             ]);
           }
           final q = query.toLowerCase();
@@ -243,17 +245,43 @@ class _GateState extends State<_Gate> {
             'rouvrir le coffre, ni toi ni moi.',
             textAlign: TextAlign.center,
             style: TextStyle(color: p.sub, fontSize: 13.5, height: 1.35)),
-        if (!store.linked)
-          Padding(
-            padding: const EdgeInsets.only(top: 10),
-            child: Text(
-                'Bim n\'est pas relié à GitHub sur cet appareil : relie-le d\'abord dans les réglages '
-                'pour retrouver le coffre de tes autres appareils.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: prioColors[1], fontSize: 13.5, height: 1.35)),
-          ),
       ],
     ]));
+  }
+}
+
+/// Coffre introuvable tant que Bim n'est pas relié : on renvoie vers la liaison.
+class _LinkFirst extends StatelessWidget {
+  const _LinkFirst();
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    return Padding(
+        padding: const EdgeInsets.fromLTRB(24, 26, 24, 24),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Icon(Icons.link_rounded, size: 40, color: p.accent),
+          const SizedBox(height: 14),
+          const Text('Relie d\'abord cet appareil',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 10),
+          Text(
+              'Ton coffre de notes est rangé dans ton dépôt GitHub. Relie Bim ici, puis ouvre le '
+              'coffre avec ton code habituel. Sur ton téléphone : Réglages → Relier un autre appareil.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: p.sub, fontSize: 15, height: 1.35)),
+          const SizedBox(height: 22),
+          FilledButton(
+            onPressed: () => sheet(context, const ReceiveLinkSheet()),
+            style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+            child: const Text('Relier avec un code de liaison',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+              onPressed: () => sheet(context, const SyncSheet()),
+              child: const Text('Saisir le dépôt et le jeton à la main')),
+        ]));
   }
 }
 

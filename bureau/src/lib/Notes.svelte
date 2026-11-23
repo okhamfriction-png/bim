@@ -3,8 +3,10 @@
     vault, exists, allNotes, noteCats, NOTE_ICON, createVault, unlock, lock, saveNote, removeNote,
     newNote, newItem, syncNotes,
   } from './notes.svelte.js';
+  import { app } from './store.svelte.js';
   import { courses, courseItems, addCourse, toggleCourse, clearCourses, syncCourses } from './courses.svelte.js';
 
+  let { liaison } = $props();
   let code = $state('');
   let again = $state('');
   let error = $state('');
@@ -123,7 +125,18 @@
   </form>
 </article>
 
-{#if !vault.unlocked}
+{#if !vault.unlocked && !exists() && !(app.repo && app.token)}
+  <!-- Pas relié : le coffre existe peut-être ailleurs, on n'en crée pas un second. -->
+  <div class="gate">
+    <div class="big">🔗</div>
+    <h3>Relie d'abord cet ordinateur</h3>
+    <p class="muted">
+      Ton coffre de notes est rangé dans ton dépôt GitHub. Relie Bim ici, puis ouvre le coffre avec
+      ton code habituel. Sur ton téléphone : Réglages → Relier un autre appareil.
+    </p>
+    <button class="btn primary" onclick={liaison}>Relier avec un code de liaison</button>
+  </div>
+{:else if !vault.unlocked}
   <form class="gate" onsubmit={go}>
     <div class="big">🔒</div>
     <h3>{exists() ? 'Tes notes sont sous clé' : 'Crée ton coffre de notes'}</h3>

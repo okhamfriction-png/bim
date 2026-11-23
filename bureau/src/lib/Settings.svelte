@@ -2,7 +2,7 @@
   import { app, saveUi, link } from './store.svelte.js';
   import { syncNotes } from './notes.svelte.js';
 
-  let { close } = $props();
+  let { close, liaison } = $props();
   let repo = $state(app.repo || 'okhamfriction-png/bim-data');
   let token = $state(app.token);
 
@@ -59,6 +59,12 @@
 
   <h3>Synchronisation</h3>
   <p class="muted">Le même fichier que sur le téléphone, dans ton dépôt GitHub privé.</p>
+  {#if app.repo && app.token}
+    <button class="btn primary" onclick={() => liaison('send')}>Relier un autre appareil</button>
+  {:else}
+    <button class="btn primary" onclick={() => liaison('receive')}>Relier avec un code de liaison</button>
+    <p class="muted small">Le code se fait sur un appareil déjà relié : Réglages → Relier un autre appareil. Ou bien, à la main :</p>
+  {/if}
   <label class="field">Dépôt<input bind:value={repo} autocomplete="off" placeholder="compte/bim-data" /></label>
   <label class="field">Jeton d'accès GitHub<input type="password" bind:value={token} autocomplete="off" /></label>
   <p class:err={app.sync === 'error'} class="state">
@@ -91,5 +97,6 @@
   .state.err { color: var(--p0); }
   .primary { padding: 11px; }
   p { margin: 0; }
+  .small { font-size: 12.5px; }
   input.hour { width: 58px; padding: 2px 6px; }
 </style>

@@ -4,13 +4,21 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'consignes.dart';
 import 'courses.dart';
 import 'kpi.dart';
+import 'liaison.dart';
+import 'liaison_code.dart';
 import 'notes.dart';
 import 'notes_screen.dart';
 import 'screens.dart';
 import 'store.dart';
 import 'ui.dart';
+import 'url_io.dart' if (dart.library.js_interop) 'url_web.dart';
+
+/// Code de liaison reçu dans l'adresse (…/bim/#relier=bim1.…), lu avant que Flutter ne la touche.
+String? _liaisonAtStart;
 
 Future<void> main() async {
+  _liaisonAtStart = findLiaison(Uri.base.fragment);
+  if (_liaisonAtStart != null) clearUrlFragment();
   WidgetsFlutterBinding.ensureInitialized();
   await store.load();
   await notes.load();
@@ -116,6 +124,14 @@ class _ShellState extends State<Shell> {
   @override
   void initState() {
     super.initState();
+    // Ouvert depuis un lien de liaison (…/bim/#relier=bim1.…) : on demande le code court.
+    final code = _liaisonAtStart;
+    _liaisonAtStart = null;
+    if (code != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) sheet(context, ReceiveLinkSheet(code: code));
+      });
+    }
     _life = AppLifecycleListener(onResume: () {
       store.loadWidgetConfig();
       store.sync();

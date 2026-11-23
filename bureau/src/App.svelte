@@ -12,8 +12,34 @@
   import Agenda from './lib/Agenda.svelte';
   import Settings from './lib/Settings.svelte';
   import Notes from './lib/Notes.svelte';
+  import Liaison from './lib/Liaison.svelte';
+  import { findLiaison } from './lib/liaison.js';
 
-  let settings = $state(!app.token);
+  // Ouvert depuis un lien de liaison (…#relier=bim1.…) : on demande le code court, et on
+  // retire aussitôt le code de l'adresse.
+  const given = findLiaison(location.hash);
+  if (given) window.history.replaceState(null, '', location.pathname + location.search);
+  let liaison = $state(given ? { mode: 'receive', code: given } : null); // { mode: send | receive, code? }
+  let settings = $state(!app.token && !given);
+  let notice = $state('');
+  // Lien collé dans un onglet Bim déjà ouvert : seul le fragment change, la page ne se recharge pas.
+  window.addEventListener('hashchange', () => {
+    const c = findLiaison(location.hash);
+    if (!c) return;
+    window.history.replaceState(null, '', location.pathname + location.search);
+    settings = false;
+    liaison = { mode: 'receive', code: c };
+  });
+  function openLiaison(mode) {
+    settings = false;
+    liaison = { mode };
+  }
+  function linked(vaultFound) {
+    notice = vaultFound
+      ? 'Relié. Ton coffre de notes s\'ouvre avec ton code habituel, dans Notes.'
+      : 'Relié.';
+    setTimeout(() => (notice = ''), 7000);
+  }
   let showDone = $state(false);
   let closing = $state(null); // sprint en cours de clôture
   let history = $state(false);
@@ -150,13 +176,15 @@
     {#if show('notes')}
       <section class="block">
         <div class="head"><div><h2>Notes</h2><span class="muted">Courses et coffre chiffré, partagés avec le téléphone</span></div></div>
-        <Notes />
+        <Notes liaison={() => openLiaison('receive')} />
       </section>
     {/if}
   </main>
 </div>
 
-{#if settings}<Settings close={() => (settings = false)} />{/if}
+{#if settings}<Settings close={() => (settings = false)} liaison={openLiaison} />{/if}
+{#if liaison}{#key liaison}<Liaison mode={liaison.mode} code={liaison.code} close={() => (liaison = null)} done={linked} />{/key}{/if}
+{#if notice}<div class="notice" role="status">{notice}</div>{/if}
 {#if closing}<Cloture sprint={closing} close={() => (closing = null)} />{/if}
 {#if history}<Historique close={() => (history = false)} />{/if}
 
@@ -205,6 +233,11 @@
   .fold {
     width: 100%; text-align: left; padding: 9px 14px; border-top: 1px solid var(--line);
     font-weight: 700; font-size: 13px; color: var(--sub); background: var(--soft);
+  }
+  .notice {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 30;
+    background: var(--ink); color: var(--card); padding: 12px 18px; border-radius: 12px;
+    font-weight: 700; box-shadow: var(--shadow);
   }
   @media (max-width: 900px) {
     main { grid-template-columns: 1fr !important; overflow: auto; }
