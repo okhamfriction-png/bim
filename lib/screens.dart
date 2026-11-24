@@ -170,10 +170,19 @@ class _NowScreenState extends State<NowScreen> {
                   Icon(Icons.stars_rounded, size: 19, color: _statusColors['tenu']),
                   const SizedBox(width: 9),
                   Expanded(
-                    child: Text(
-                        'Valeur  ${store.valueWeek} / ${store.targetOf(store.current)} pts',
+                    child: Text.rich(
+                        TextSpan(children: [
+                          TextSpan(
+                              text: '${store.valueWeek}',
+                              style: TextStyle(
+                                  fontSize: 34,
+                                  height: 1,
+                                  fontWeight: FontWeight.w900,
+                                  color: _statusColors['tenu'])),
+                          TextSpan(text: '  / ${store.targetOf(store.current)} pts'),
+                        ]),
                         style: TextStyle(
-                            fontSize: 14.5, fontWeight: FontWeight.w800, color: p.ink)),
+                            fontSize: 15, fontWeight: FontWeight.w800, color: p.sub)),
                   ),
                   Text('+${store.valueToday} aujourd\'hui',
                       style: TextStyle(

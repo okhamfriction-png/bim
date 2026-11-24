@@ -1,13 +1,14 @@
 <script>
   import {
     app, sync, thisMonday, sprints, sprintTasks, looseTasks, doneThisWeek, dateOf, addDays,
-    valueWeek, valueToday, bonus, BONUS_EVERY, targetOf, plannedIn, p0In,
+    valueWeek, valueToday, healthIn, bonus, BONUS_EVERY, targetOf, plannedIn, p0In,
     current, closedSprints, closureOf, velocityLabel, saveUi,
   } from './lib/store.svelte.js';
   import Cloture from './lib/Cloture.svelte';
   import Historique from './lib/Historique.svelte';
   import Kpi from './lib/Kpi.svelte';
   import Sante from './lib/Sante.svelte';
+  import Panier from './lib/Panier.svelte';
   import Dictee from './lib/Dictee.svelte';
   import Lanes from './lib/Lanes.svelte';
   import Task from './lib/Task.svelte';
@@ -69,6 +70,7 @@
   const cur = $derived(current());
   const target = $derived(targetOf(cur));
   const value = $derived(valueWeek());
+  const sante = $derived(healthIn(cur));
   const tokens = $derived(bonus());
   const fmtDate = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
   const fmtShort = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' });
@@ -129,6 +131,15 @@
           </div>
           <span class="plan" class:warn={warn(cur)}>{plan(cur)}</span>
           {#if closable(cur)}<button class="btn primary" onclick={() => (closing = cur)}>Clôturer le sprint</button>{/if}
+        </div>
+        <div class="score" title="Points gagnés cette semaine, sur la cible du sprint">
+          <span class="ball">🏀</span>
+          <div class="num">{#key value}<b>{value}</b>{/key}<span>/ {target} pts</span></div>
+          <div class="track">
+            <div class="bar"><i style="width: {target ? Math.min(100, (100 * value) / target) : 0}%"></i></div>
+            <small>+{valueToday()} aujourd'hui · reste {Math.max(0, target - value)} pour la cible</small>
+          </div>
+          <span class="chip">❤️ Santé {sante.p + sante.m}/14</span>
         </div>
         {#if lastClosed}
           <div class="sub closed">
@@ -199,6 +210,7 @@
 {#if history}<Historique close={() => (history = false)} />{/if}
 {#if dictating}<Dictee close={() => (dictating = false)} done={said} />{/if}
 {#if toast}<div class="toast">{toast}</div>{/if}
+<Panier />
 
 <style>
   .app { height: 100%; display: flex; flex-direction: column; }
@@ -241,6 +253,17 @@
   h2 { margin: 0; font-size: 16px; }
   .plan { font-size: 12.5px; font-weight: 700; color: var(--sub); text-align: right; }
   .plan.warn { color: var(--p0); }
+  .score { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  .score .ball { font-size: 34px; line-height: 1; }
+  .score .num { display: flex; align-items: baseline; gap: 7px; white-space: nowrap; }
+  .score .num b { font-size: 40px; font-weight: 900; line-height: 1; color: var(--ok); display: inline-block; animation: bump .5s ease; }
+  .score .num span { font-size: 16px; font-weight: 700; color: var(--sub); }
+  .score .track { flex: 1; min-width: 80px; display: flex; flex-direction: column; gap: 5px; }
+  .score .track .bar { height: 10px; border-radius: 99px; background: var(--line); overflow: hidden; }
+  .score .track .bar i { display: block; height: 100%; border-radius: 99px; background: var(--ok); transition: width .6s ease; }
+  .score small { color: var(--sub); font-size: 12.5px; }
+  .score .chip { font-weight: 800; font-size: 13.5px; white-space: nowrap; padding: 5px 10px; border-radius: 99px; border: 1px solid var(--line); }
+  @keyframes bump { 0% { transform: scale(1.5); } 100% { transform: scale(1); } }
   .scroll { overflow: auto; flex: 1; min-height: 0; }
   .sub {
     display: flex; justify-content: space-between; align-items: center; gap: 10px;

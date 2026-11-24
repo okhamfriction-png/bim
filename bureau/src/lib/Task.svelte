@@ -1,7 +1,7 @@
 <script>
   import {
     PRIO, CATS, KINDS, iconOf, pointsLabel, unitsLabel, sprints, dateOf, catOf,
-    complete, reopen, toggleSub, addSub, removeSub, remove, touch, whole, setPrise, priseSummary, noted, kindOf, BLOCK_FIELDS, blockSummary, hasData, setSubField,
+    complete, reopen, toggleSub, addSub, removeSub, renameSub, remove, touch, whole, setPrise, priseSummary, noted, kindOf, BLOCK_FIELDS, blockSummary, hasData, setSubField,
   } from './store.svelte.js';
 
   let { t, drag = true } = $props();
@@ -68,7 +68,9 @@
           {#each t.subs as s, i}
             <label class="sub" class:on={s.done}>
               <input type="checkbox" checked={s.done} onchange={() => toggleSub(t, s)} />
-              <span>{s.title}</span>
+              <input class="name" value={s.title} aria-label="Nom de la sous-tâche" title="Clique pour renommer"
+                onchange={(e) => { renameSub(t, s, e.currentTarget.value); e.currentTarget.value = s.title; }}
+                onkeydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { e.currentTarget.value = s.title; e.currentTarget.blur(); } }} />
               {#if whole(t)}
                 <button class="res" class:has={noted(s)} title="Résultats de la prise"
                   onclick={(e) => { e.preventDefault(); noting = noting === i ? -1 : i; }}>
@@ -179,6 +181,13 @@
   .sub { display: flex; align-items: center; gap: 9px; padding: 4px 0; }
   .sub input { width: 17px; height: 17px; accent-color: var(--ok); flex: none; }
   .sub span { flex: 1; }
+  .sub input.name {
+    flex: 1; min-width: 0; width: auto; height: auto; padding: 2px 6px; margin-left: -6px; font: inherit; color: inherit;
+    background: none; border: 1px solid transparent; border-radius: 7px; text-overflow: ellipsis;
+  }
+  .sub input.name:hover { border-color: var(--line); }
+  .sub input.name:focus { border-color: var(--accent); background: var(--card); outline: none; }
+  .sub.on input.name:not(:focus) { color: var(--sub); text-decoration: line-through; }
   .res { flex: none; font-size: 12px; font-weight: 700; padding: 1px 9px; border: 1px solid var(--line); border-radius: 99px; color: var(--sub); }
   .res.has { color: var(--ink); }
   .bilan .yes { flex-direction: row; align-items: center; gap: 6px; }

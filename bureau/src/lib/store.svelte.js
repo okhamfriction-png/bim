@@ -603,6 +603,12 @@ export function addSub(t, title) {
   settle(t);
   touch(t);
 }
+export function renameSub(t, s, title) {
+  const x = String(title ?? '').trim();
+  if (!x || x === s.title) return;
+  s.title = x;
+  touch(t);
+}
 export function removeSub(t, s) {
   t.subs = t.subs.filter((x) => x !== s);
   if (!t.subs.length) delete t.subs;

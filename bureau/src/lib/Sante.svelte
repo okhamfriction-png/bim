@@ -8,15 +8,19 @@
   const today = $derived(ymd(new Date(app.now)));
   const days = $derived(Array.from({ length: 7 }, (_, i) => addDays(dateOf(sprint), i)));
   const score = $derived(healthIn(sprint));
+  // Replié par défaut : seule la ligne du jour. Un clic sur l'en-tête montre la semaine.
+  let open = $state(false);
+  const shown = $derived(open || !days.some((d) => ymd(d) === today) ? days : days.filter((d) => ymd(d) === today));
 </script>
 
 <div class="sante">
-  <div class="top">
+  <button class="top" onclick={() => (open = !open)} aria-expanded={open}>
     <div><b>❤️ Santé du jour</b> <span class="muted">— est-ce que j'ai tenu ?</span></div>
-    <span class="count">Santé : {score.p + score.m}/14</span>
-  </div>
+    <span class="count">Santé : {score.p + score.m}/14 {open ? '▾' : '▸'}</span>
+  </button>
   <div class="line head"><span></span>{#each KEYS as [, name]}<span>{name}</span>{/each}</div>
-  {#each days as day, i}
+  {#each shown as day}
+    {@const i = days.indexOf(day)}
     {@const d = ymd(day)}
     <div class="line" class:now={d === today} class:future={d > today}>
       <span class="day">{SHORT[i]} {day.getDate()}</span>
@@ -34,7 +38,7 @@
 
 <style>
   .sante { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; margin-top: 14px; flex: none; background: var(--card); }
-  .top { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 14px; background: var(--soft); }
+  .top { width: 100%; text-align: left; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 14px; background: var(--soft); }
   .count { font-weight: 800; white-space: nowrap; }
   .line { display: grid; grid-template-columns: 90px 1fr 1fr; align-items: center; padding: 5px 14px; }
   .line > span { text-align: center; }

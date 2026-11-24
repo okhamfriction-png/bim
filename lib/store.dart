@@ -812,6 +812,13 @@ class Store extends ChangeNotifier {
     touch(t);
   }
 
+  void renameSub(Task t, Sub s, String title) {
+    final x = title.trim();
+    if (x.isEmpty || x == s.title) return;
+    s.title = x;
+    touch(t);
+  }
+
   void removeSub(Task t, Sub s) {
     t.subs.remove(s);
     _settle(t);

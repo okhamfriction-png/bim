@@ -5,6 +5,7 @@ import 'consignes.dart';
 import 'courses.dart';
 import 'dictee.dart';
 import 'kpi.dart';
+import 'panier.dart';
 import 'liaison.dart';
 import 'liaison_code.dart';
 import 'notes.dart';
@@ -162,7 +163,8 @@ class _ShellState extends State<Shell> {
       listenable: Listenable.merge([store, notes, consignes]),
       builder: (context, _) => Scaffold(
         body: SafeArea(
-          child: Center(
+          child: Stack(children: [
+          Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 640),
               child: Column(children: [
@@ -231,6 +233,8 @@ class _ShellState extends State<Shell> {
               ]),
             ),
           ),
+          const Positioned.fill(child: PanierOverlay()),
+          ]),
         ),
         bottomNavigationBar: DecoratedBox(
           decoration: BoxDecoration(border: Border(top: BorderSide(color: p.line))),

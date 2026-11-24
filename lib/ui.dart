@@ -784,6 +784,15 @@ class SubList extends StatefulWidget {
 class _SubListState extends State<SubList> {
   final field = TextEditingController();
   final focus = FocusNode();
+  final rename = TextEditingController();
+  Sub? editing; // sous-tâche en cours de renommage
+
+  void endRename(String v) {
+    final s = editing;
+    if (s == null) return;
+    setState(() => editing = null);
+    store.renameSub(widget.task, s, v);
+  }
 
   void add([int count = 1]) {
     final t = widget.task;
@@ -797,6 +806,7 @@ class _SubListState extends State<SubList> {
   @override
   void dispose() {
     field.dispose();
+    rename.dispose();
     focus.dispose();
     super.dispose();
   }
@@ -819,7 +829,31 @@ class _SubListState extends State<SubList> {
         ),
       for (final s in t.subs)
         Row(children: [
-          Expanded(child: SubCheck(t, s)),
+          Expanded(
+            child: identical(editing, s)
+                ? TextField(
+                    controller: rename,
+                    autofocus: true,
+                    textCapitalization: TextCapitalization.sentences,
+                    textInputAction: TextInputAction.done,
+                    style: const TextStyle(fontSize: 15),
+                    decoration: const InputDecoration(isDense: true),
+                    onSubmitted: (v) => endRename(v),
+                    onTapOutside: (_) => endRename(rename.text),
+                  )
+                : SubCheck(t, s),
+          ),
+          if (!identical(editing, s))
+            IconButton(
+                tooltip: 'Renommer la sous-tâche',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => setState(() {
+                      editing = s;
+                      rename.text = s.title;
+                      rename.selection =
+                          TextSelection(baseOffset: 0, extentOffset: s.title.length);
+                    }),
+                icon: Icon(Icons.edit_rounded, size: 17, color: p.sub)),
           IconButton(
               tooltip: 'Retirer la sous-tâche',
               visualDensity: VisualDensity.compact,

@@ -51,21 +51,37 @@ class _Box extends StatelessWidget {
 }
 
 /// Le bloc en bas du sprint : une ligne par jour, du lundi au dimanche.
-class SantePanel extends StatelessWidget {
+/// Replié par défaut : seule la ligne du jour est affichée. Un appui sur l'en-tête montre la semaine.
+class SantePanel extends StatefulWidget {
   final String sprint;
   const SantePanel(this.sprint, {super.key});
   @override
+  State<SantePanel> createState() => _SantePanelState();
+}
+
+class _SantePanelState extends State<SantePanel> {
+  bool open = false;
+  @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
+    final sprint = widget.sprint;
     final d0 = dateOf(sprint);
     final today = ymd(DateTime.now());
     final (a, b) = store.healthIn(sprint);
+    // Aujourd'hui hors de cette semaine : rien à replier sur le jour, on montre tout.
+    final inWeek = [for (var i = 0; i < 7; i++) ymd(_plus(d0, i))].contains(today);
     return Panel(
-      header: PanelHead('Santé du jour',
-          subtitle: 'Est-ce que j\'ai tenu ?',
-          icon: Icons.favorite_rounded,
-          color: santeColor,
-          count: 'Santé : ${a + b}/14'),
+      header: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => setState(() => open = !open),
+        child: PanelHead('Santé du jour',
+            subtitle: 'Est-ce que j\'ai tenu ?',
+            icon: Icons.favorite_rounded,
+            color: santeColor,
+            count: 'Santé : ${a + b}/14',
+            trailing: Icon(open ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                color: p.sub)),
+      ),
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(14, 8, 8, 6),
@@ -80,6 +96,7 @@ class SantePanel extends StatelessWidget {
           ]),
         ),
         for (var i = 0; i < 7; i++)
+          if (open || inWeek == false || ymd(_plus(d0, i)) == today)
           Builder(builder: (context) {
             final day = _plus(d0, i);
             final d = ymd(day);
