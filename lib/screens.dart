@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'cloture.dart';
 import 'defi.dart';
 import 'models.dart';
+import 'rappels.dart';
 import 'store.dart';
 import 'ui.dart';
 
@@ -219,6 +220,7 @@ class _NowScreenState extends State<NowScreen> {
               ]),
             ),
         ]),
+        const RemindersPanel(),
         if (ask != null) pad(_CutAsk(ask)),
         if (review)
           pad(Padding(
@@ -1125,6 +1127,7 @@ class _MonthGrid extends StatelessWidget {
                 final isToday = ymd(d) == today;
                 final event = s.eventsOn(d).isNotEmpty;
                 final n = big ? s.occs(d).length : 0;
+                final bell = big && s.remindersOn(d).any((e) => e['done'] != true);
                 return GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: () => onDay(d),
@@ -1153,7 +1156,14 @@ class _MonthGrid extends StatelessWidget {
                                   margin: const EdgeInsets.symmetric(horizontal: 1.5),
                                   decoration: BoxDecoration(
                                       color: Color.lerp(c, p.ink, .4), shape: BoxShape.circle)),
-                            if (n == 0) const SizedBox(height: 5),
+                            if (bell)
+                              Container(
+                                  width: 6,
+                                  height: 6,
+                                  margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                                  decoration: const BoxDecoration(
+                                      color: rappelColor, shape: BoxShape.circle)),
+                            if (n == 0 && !bell) const SizedBox(height: 5),
                           ]),
                         ),
                     ]),
@@ -1239,6 +1249,11 @@ class _TimeGrid extends StatelessWidget {
       for (final h in s.hints(d)) {
         if (h.start < lo) lo = h.start;
         if (h.start + 30 > hi) hi = h.start + 30;
+      }
+      for (final e in s.remindersOn(d)) {
+        final st = (e['start'] as num).toInt();
+        if (st < lo) lo = st;
+        if (st + 30 > hi) hi = st + 30;
       }
     }
     // L'heure qu'il est doit toujours tomber dans la plage, pour que la ligne bleue soit visible.
@@ -1406,6 +1421,55 @@ class _TimeGrid extends StatelessWidget {
                       ),
                     ]),
                   ),
+                // Rappels : une étiquette à l'heure dite (une cloche seule en vue semaine).
+                for (final e in s.remindersOn(d))
+                  Positioned(
+                    top: (y((e['start'] as num).toInt()) - (wide ? 12 : 9)).clamp(0.0, total - 18),
+                    left: 2,
+                    right: 2,
+                    child: GestureDetector(
+                      onTap: () => openReminder(context, event: e),
+                      child: Opacity(
+                        opacity: e['done'] == true ? .5 : 1,
+                        child: Row(children: [
+                          Flexible(
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: wide ? 9 : 2, vertical: wide ? 3 : 1),
+                              decoration: BoxDecoration(
+                                  color: rappelColor,
+                                  borderRadius: BorderRadius.circular(99),
+                                  border: Border.all(color: p.card, width: 1.5)),
+                              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                Icon(
+                                    e['done'] == true
+                                        ? Icons.check_rounded
+                                        : Icons.notifications_active_rounded,
+                                    size: wide ? 16 : 13,
+                                    color: Colors.white),
+                                if (wide)
+                                  Flexible(
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(left: 6),
+                                      child: Text(
+                                          '${hm((e['start'] as num).toInt())}  ·  ${e['label']}',
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                              fontSize: 13.5,
+                                              fontWeight: FontWeight.w800,
+                                              color: Colors.white,
+                                              decoration: e['done'] == true
+                                                  ? TextDecoration.lineThrough
+                                                  : null)),
+                                    ),
+                                  ),
+                              ]),
+                            ),
+                          ),
+                        ]),
+                      ),
+                    ),
+                  ),
                 // Ligne « maintenant » : épaisse avec un point sur aujourd'hui, fine sur les autres jours.
                 if (showNow && ymd(d) != today)
                   Positioned(
@@ -1485,7 +1549,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
       body.add(_MonthGrid(cursor.year, cursor.month, big: true, onDay: (d) => go('jour', d)));
       body.add(Padding(
         padding: const EdgeInsets.only(top: 14),
-        child: Text('Point = bloc fixe · pastille jaune = spectacle · touche un jour pour l\'ouvrir',
+        child: Text('Point = bloc fixe · point vert = rappel · pastille jaune = spectacle · touche un jour pour l\'ouvrir',
             style: TextStyle(color: p.sub, fontSize: 13)),
       ));
     } else {
@@ -1527,13 +1591,17 @@ class _AgendaScreenState extends State<AgendaScreen> {
         if (planned > 0 && grid)
           Pill('Blocs tenus  $held / $planned', _statusColors['tenu']!,
               icon: Icons.check_circle_rounded),
+        IconButton(
+            tooltip: 'Ajouter un rappel',
+            onPressed: () => openReminder(context, day: view == 'jour' ? cursor : null),
+            icon: const Icon(Icons.add_alert_rounded, color: rappelColor)),
         if (grid)
           IconButton(
               tooltip: 'Revue de la semaine',
               onPressed: () => openReview(context),
               icon: Icon(Icons.fact_check_rounded, color: p.sub))
         else
-          const SizedBox(width: 8, height: 48),
+          const SizedBox(width: 8),
       ]),
     );
     final tabs = Padding(

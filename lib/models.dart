@@ -307,7 +307,8 @@ class Schedule {
   String nameB;
   List<Block> blocks;
 
-  /// Dates ponctuelles : {id, date, start, label, blockId, cutEnd}.
+  /// Dates ponctuelles : {id, date, start, label, blockId, cutEnd}. Un rappel est une date
+  /// avec `rappel: true`, `done` et `at` (instant de la dernière modification).
   /// `blockId` est le bloc raccourci ce jour-là, `cutEnd` l'heure choisie (minutes) ou null.
   List<Map<String, dynamic>> events;
 
@@ -472,8 +473,16 @@ class Schedule {
       blocks.where((b) => !b.fixed && _on(b, day)).toList()
         ..sort((a, b) => a.start.compareTo(b.start));
 
-  List<Map<String, dynamic>> eventsOn(DateTime day) =>
-      events.where((e) => e['date'] == ymd(day) && e['tag'] != true).toList();
+  List<Map<String, dynamic>> eventsOn(DateTime day) => events
+      .where((e) => e['date'] == ymd(day) && e['tag'] != true && e['rappel'] != true)
+      .toList();
+
+  /// Les rappels d'un jour, par heure : des dates marquées `rappel`, montrées comme un repère
+  /// à cocher (`done`) et non comme un créneau. Supprimé = `deleted`, sans date.
+  List<Map<String, dynamic>> remindersOn(DateTime day) => events
+      .where((e) => e['rappel'] == true && e['deleted'] != true && e['date'] == ymd(day))
+      .toList()
+    ..sort((a, b) => (a['start'] as num).compareTo(b['start'] as num));
 
   /// Libellé d'un bloc ce jour-là : une date « étiquette » (`tag`) rattachée au bloc le
   /// précise (la salle de la répétition, par exemple) sans ajouter de case à l'agenda.

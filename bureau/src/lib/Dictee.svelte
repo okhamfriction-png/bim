@@ -1,8 +1,9 @@
 <script>
-  // Dictée : on parle, Bim range. Le premier mot dit où : « note… », « tâche… », « courses… ».
+  // Dictée : on parle, Bim range. Le premier mot dit où : « note… », « tâche… », « courses… », « rappel… ».
   import { onMount } from 'svelte';
   import { route, splitArticles } from './dictee.js';
-  import { addTask } from './store.svelte.js';
+  import { addTask, saveReminder } from './store.svelte.js';
+  import { parseReminder, defaultTime, when } from './rappel.js';
   import { addCourse } from './courses.svelte.js';
   import { vault, newNote, saveNote } from './notes.svelte.js';
 
@@ -13,7 +14,13 @@
   let listening = $state(false);
   let error = $state('');
   let rec;
-  const KINDS = [['note', '📝 Note'], ['tache', '✅ Tâche'], ['courses', '🛒 Courses']];
+  const KINDS = [['note', '📝 Note'], ['tache', '✅ Tâche'], ['courses', '🛒 Courses'], ['rappel', '🔔 Rappel']];
+  // Un rappel : le jour et l'heure dits dans la phrase, sinon aujourd'hui à la prochaine heure.
+  const reminder = $derived.by(() => {
+    const r = parseReminder(text);
+    const day = r.day ?? new Date();
+    return { text: r.text, day, minutes: r.minutes ?? defaultTime(day) };
+  });
   const locked = $derived(kind === 'note' && !vault.unlocked);
 
   function start() {
@@ -58,6 +65,12 @@
       const l = splitArticles(s);
       l.forEach(addCourse);
       where = l.length > 1 ? `${l.length} articles ajoutés aux courses` : 'Ajouté aux courses';
+    } else if (kind === 'rappel') {
+      if (!reminder.text) return;
+      saveReminder(null, reminder.text, reminder.day, reminder.minutes);
+      done(`Rappel ${when(reminder.day, reminder.minutes)} : ${reminder.text}`);
+      close();
+      return;
     } else if (kind === 'tache') {
       addTask(s, { domain: 'Personnel' });
       where = 'Tâche ajoutée au backlog';
@@ -77,7 +90,7 @@
       title={listening ? 'Arrêter' : 'Parler'}>{listening ? '◼' : '🎤'}</button>
     <div>
       <h3>{listening ? "Je t'écoute…" : 'Dictée'}</h3>
-      <span class="muted">Commence par « note », « tâche » ou « courses ».</span>
+      <span class="muted">Commence par « note », « tâche », « courses » ou « rappel ».</span>
     </div>
   </div>
   <!-- svelte-ignore a11y_autofocus -->
@@ -89,6 +102,7 @@
       <button type="button" class:on={kind === k} onclick={() => { kind = k; chosen = true; }}>{label}</button>
     {/each}
   </div>
+  {#if kind === 'rappel' && text.trim()}<p class="when">Rappel {when(reminder.day, reminder.minutes)}. Dis le jour et l'heure dans la phrase pour les changer.</p>{/if}
   {#if locked}<p class="warn">Le coffre de notes est fermé : ouvre-le dans le bloc Notes, ou range ça en tâche.</p>{/if}
   <div class="actions">
     <button type="button" class="btn" onclick={close}>Annuler</button>
@@ -111,7 +125,8 @@
   p { margin: 0; }
   .err { color: var(--p0); font-weight: 600; }
   .warn { color: var(--p1); font-size: 13.5px; }
-  .picks { display: flex; gap: 8px; }
+  .when { color: #0d9488; font-weight: 700; font-size: 13.5px; }
+  .picks { display: flex; flex-wrap: wrap; gap: 8px; }
   .picks button { border: 1.5px solid var(--line); border-radius: 99px; padding: 6px 13px; font-weight: 600; }
   .picks button.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 20%, transparent); font-weight: 800; }
   .actions { display: flex; justify-content: flex-end; gap: 8px; }

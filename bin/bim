@@ -332,6 +332,64 @@ def cmd_courses(a):
             print(("[x] " if i.get("done") else "[ ] ") + i["text"])
 
 
+def cmd_rappel(a):
+    """Rappels de l'agenda : un repère à l'heure dite, pas un créneau."""
+    def alive(doc):
+        return [e for e in doc.get("schedule", {}).get("events", [])
+                if e.get("rappel") and not e.get("deleted")]
+
+    if a.fait:
+        key = a.fait.strip().lower()
+
+        def fn(doc):
+            hits = [e for e in alive(doc) if not e.get("done") and e["label"].lower().startswith(key)]
+            if len(hits) == 1:
+                hits[0]["done"] = True
+                hits[0]["at"] = now_ms()
+                doc["schedule"]["updatedAt"] = now_ms()
+            return hits
+
+        hits = change(fn, "bim : rappel fait")
+        if len(hits) != 1:
+            sys.exit("Aucun rappel trouvé." if not hits else "Plusieurs rappels correspondent : "
+                     + ", ".join(e["label"] for e in hits))
+        print(f"Fait : {hits[0]['label']}")
+        return
+    if a.texte:
+        try:
+            day = time.strftime("%Y-%m-%d", time.strptime(a.jour, "%Y-%m-%d")) if a.jour \
+                else time.strftime("%Y-%m-%d")
+            h, _, m = (a.heure or "9").lower().replace("h", ":").partition(":")
+            start = int(h) * 60 + int(m or 0)
+            if not 0 <= start < 1440:
+                raise ValueError
+        except ValueError:
+            sys.exit("Jour au format 2026-11-29, heure au format 11:00 ou 11h30.")
+        label = a.texte.strip()
+
+        def fn(doc):
+            sc = doc.setdefault("schedule", {})
+            if any(e["label"].lower() == label.lower() and e.get("date") == day and e.get("start") == start
+                   for e in alive(doc)):
+                return False
+            sc.setdefault("events", []).append({
+                "id": new_id(), "date": day, "start": start, "label": label, "blockId": None,
+                "cutEnd": None, "rappel": True, "done": False, "at": now_ms()})
+            sc["updatedAt"] = now_ms()
+            return True
+
+        ok = change(fn, "bim : rappel")
+        print((f"Rappel ajouté : {label}" if ok else f"Déjà dans l'agenda : {label}")
+              + f" ({day} à {start // 60} h{start % 60:02d})")
+        return
+    items = sorted(alive(read()), key=lambda e: (e.get("date", ""), e.get("start", 0)))
+    if not items:
+        print("Aucun rappel.")
+    for e in items:
+        print(("[x] " if e.get("done") else "[ ] ")
+              + f"{e['date']} {e['start'] // 60:02d}:{e['start'] % 60:02d}  {e['label']}")
+
+
 def main():
     p = argparse.ArgumentParser(prog="bim", description="Backlog Bim")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -361,6 +419,12 @@ def main():
     c.add_argument("articles", nargs="*")
     c.add_argument("--pris", help="cocher l'article qui commence ainsi")
     c.set_defaults(fn=cmd_courses)
+    ra = sub.add_parser("rappel", help="rappels de l'agenda : voir, ajouter, cocher")
+    ra.add_argument("texte", nargs="?")
+    ra.add_argument("-j", "--jour", help="jour, au format 2026-11-29 (aujourd'hui par défaut)")
+    ra.add_argument("-H", "--heure", help="heure, 11:00 ou 11h30 (9 h par défaut)")
+    ra.add_argument("--fait", help="cocher le rappel qui commence ainsi")
+    ra.set_defaults(fn=cmd_rappel)
     args = p.parse_args()
     try:
         args.fn(args)

@@ -2,7 +2,7 @@
 const WORDS = [
   ['liste de courses', 'courses'], ['nouvelle tâche', 'tache'], ['nouvelle tache', 'tache'], ['nouvelle note', 'note'],
   ['à faire', 'tache'], ['a faire', 'tache'], ['courses', 'courses'], ['course', 'courses'], ['achète', 'courses'],
-  ['acheter', 'courses'], ['tâche', 'tache'], ['tache', 'tache'], ['rappel', 'tache'], ['notes', 'note'],
+  ['acheter', 'courses'], ['tâche', 'tache'], ['tache', 'tache'], ['rappelle-moi de', 'rappel'], ['rappelle-moi', 'rappel'], ['rappel', 'rappel'], ['notes', 'note'],
   ['note', 'note'], ['mémo', 'note'], ['memo', 'note'],
 ];
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);

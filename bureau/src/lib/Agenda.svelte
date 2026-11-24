@@ -1,5 +1,15 @@
 <script>
-  import { app, saveUi, mondayOf, addDays, ymd, dayItems, weekName, kidsWeek, hm } from './store.svelte.js';
+  import {
+    app, saveUi, mondayOf, addDays, ymd, dateOf, dayItems, weekName, kidsWeek, hm,
+    remindersOn, remindersNow, toggleReminder,
+  } from './store.svelte.js';
+  import Rappel from './Rappel.svelte';
+
+  let { said = () => {} } = $props();
+  let editing = $state(null); // { event } ou { day } : la fiche de rappel ouverte
+  const due = $derived(remindersNow());
+  const fmtDue = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'numeric' });
+  const overdue = (e) => !e.done && (e.date < ymd(today) || e.start <= today.getHours() * 60 + today.getMinutes());
 
   const H0 = 7, H1 = 22, PX = 44; // heures affichées, pixels par heure
   const DAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
@@ -41,12 +51,24 @@
   <button class="btn" onclick={() => offset++} aria-label="Suivant">›</button>
   {#if offset !== 0}<button class="btn" onclick={() => (offset = 0)}>Aujourd'hui</button>{/if}
   <span class="grow"></span>
+  <button class="btn bell" onclick={() => (editing = { day: week ? null : first })}>🔔 Rappel</button>
   <div class="seg">
     <button class:on={!week} onclick={() => view('jour')}>Jour</button>
     <button class:on={week} onclick={() => view('semaine')}>Semaine</button>
   </div>
 </div>
 <div class="kids" class:with={kidsWeek(first)}>{weekName(first)}</div>
+{#if due.length}
+  <div class="due">
+    {#each due as e (e.id)}
+      <div class="rem" class:done={e.done}>
+        <button class="tick" onclick={() => toggleReminder(e)} title={e.done ? 'À refaire' : "C'est fait"}>{e.done ? '✓' : ''}</button>
+        <button class="lab" onclick={() => (editing = { event: e })}>{e.label}</button>
+        <span class:late={overdue(e)}>{e.date === ymd(today) ? '' : `${fmtDue.format(dateOf(e.date))} · `}{hm(e.start)}</span>
+      </div>
+    {/each}
+  </div>
+{/if}
 
 <div class="scroll">
   <div class="head" style="grid-template-columns: 44px repeat({days.length}, 1fr)">
@@ -85,6 +107,10 @@
             </div>
           {/if}
         {/each}
+        {#each remindersOn(d) as e (e.id)}
+          <button class="rap" class:done={e.done} style="top: {top(e.start)}px" title="{hm(e.start)} · {e.label}"
+            onclick={() => (editing = { event: e })}>🔔 {week ? '' : `${hm(e.start)} · `}{e.label}</button>
+        {/each}
         {#if showNow}
           <div class="now" class:here={ymd(d) === ymd(today)} style="top: {nowY}px"></div>
         {/if}
@@ -93,7 +119,27 @@
   </div>
 </div>
 
+{#if editing}{#key editing}<Rappel event={editing.event} day={editing.day} close={() => (editing = null)} done={said} />{/key}{/if}
+
 <style>
+  .bell { font-weight: 800; }
+  .due { border-top: 1px solid var(--line); padding: 4px 10px; display: flex; flex-direction: column; }
+  .rem { display: flex; align-items: center; gap: 9px; padding: 4px 2px; font-size: 13.5px; }
+  .rem .tick {
+    width: 20px; height: 20px; border-radius: 50%; border: 2px solid #0d9488; flex: none;
+    color: #fff; font-size: 12px; font-weight: 900; line-height: 1;
+  }
+  .rem.done .tick { background: #0d9488; }
+  .rem .lab { flex: 1; text-align: left; font-weight: 700; }
+  .rem.done .lab { text-decoration: line-through; color: var(--sub); }
+  .rem span { font-weight: 800; color: var(--sub); white-space: nowrap; }
+  .rem span.late { color: var(--p0); }
+  .rap {
+    position: absolute; left: 2px; max-width: calc(100% - 4px); transform: translateY(-50%); z-index: 2;
+    background: #0d9488; color: #fff; border: 1.5px solid var(--card); border-radius: 99px;
+    padding: 1px 7px; font-size: 11.5px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .rap.done { opacity: .5; text-decoration: line-through; }
   .bar { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); }
   .bar strong { font-size: 14.5px; }
   .grow { flex: 1; }

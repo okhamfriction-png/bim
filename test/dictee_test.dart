@@ -7,7 +7,7 @@ void main() {
     expect(routeDictation('Tâche rappeler le plombier'), ('tache', 'Rappeler le plombier'));
     expect(routeDictation('courses pain de mie et verveine'), ('courses', 'Pain de mie et verveine'));
     expect(routeDictation('liste de courses eau'), ('courses', 'Eau'));
-    expect(routeDictation('rappel appeler Karim'), ('tache', 'Appeler Karim'));
+    expect(routeDictation('rappel appeler Karim'), ('rappel', 'Appeler Karim'));
     expect(routeDictation('penser à la carte grise'), ('note', 'Penser à la carte grise'));
     // « notebook » n'est pas le mot-clé « note ».
     expect(routeDictation('notebook à acheter'), ('note', 'Notebook à acheter'));

@@ -402,13 +402,52 @@ export function dayItems(day) {
     const b = blocks.find((b) => b.id === id);
     if (b) out.push({ type: 'bloc', start: m.toStart, end: m.toStart + (b.end - b.start), label: labelOf(b, orig) });
   }
-  for (const e of events.filter((e) => e.date === d && e.tag !== true)) {
+  for (const e of events.filter((e) => e.date === d && e.tag !== true && e.rappel !== true)) {
     out.push({ type: 'date', start: e.start, end: e.start + 60, label: e.label });
   }
   for (const b of blocks.filter((b) => b.fixed === false && on(b, day))) {
     out.push({ type: 'repere', start: b.start, end: b.start, label: b.label });
   }
   return out.sort((a, b) => a.start - b.start);
+}
+/** Les rappels d'un jour, par heure : des dates marquées `rappel`, à cocher, sans créneau. */
+export const remindersOn = (day) =>
+  (sched().events ?? [])
+    .filter((e) => e.rappel === true && !e.deleted && e.date === ymd(day))
+    .sort((a, b) => a.start - b.start);
+/** Les rappels du jour, et ceux d'avant restés sans coche. */
+export function remindersNow() {
+  const d = ymd(new Date(app.now));
+  return (sched().events ?? [])
+    .filter((e) => e.rappel === true && !e.deleted && e.date && (e.date === d || (!e.done && e.date < d)))
+    .sort((a, b) => (a.date + String(a.start).padStart(4, '0') < b.date + String(b.start).padStart(4, '0') ? -1 : 1));
+}
+function touchReminder(e) {
+  e.at = Date.now();
+  app.doc.schedule.updatedAt = e.at;
+  changed();
+}
+/** Crée un rappel, ou corrige celui donné. */
+export function saveReminder(e, label, day, start) {
+  const sc = (app.doc.schedule ??= {});
+  if (!e) {
+    sc.events = [...(sc.events ?? []), { id: newId(), blockId: null, cutEnd: null, rappel: true, done: false }];
+    e = sc.events.at(-1);
+  }
+  e.label = label.trim();
+  e.date = ymd(day);
+  e.start = start;
+  touchReminder(e);
+}
+export function toggleReminder(e) {
+  e.done = !e.done;
+  touchReminder(e);
+}
+/** Supprimé : gardé sans date un mois, pour que la suppression gagne sur les autres appareils. */
+export function removeReminder(e) {
+  e.deleted = true;
+  e.date = '';
+  touchReminder(e);
 }
 export const hm = (m) =>
   m % 60 === 0 ? `${Math.floor(m / 60)} h` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')}`;
@@ -563,14 +602,16 @@ const b64encode = (s) => {
   return btoa(bin);
 };
 const canon = (tasks) => JSON.stringify([...tasks].sort((a, b) => (a.id < b.id ? -1 : 1)));
-/** Ce que le bureau écrit dans l'agenda : les clôtures et les sprints créés par une clôture. */
+/** Ce que le bureau écrit dans l'agenda : les clôtures, les sprints créés par une clôture, les rappels. */
 const canonSprints = (d) => {
   const c = d.schedule?.closures ?? {};
-  return JSON.stringify([[...(d.schedule?.sprints ?? [])].sort(), Object.keys(c).sort().map((k) => [k, c[k].at ?? 0])]);
+  const raps = (d.schedule?.events ?? []).filter((e) => e.rappel === true).map((e) => [e.id, e.at ?? 0]).sort();
+  return JSON.stringify([[...(d.schedule?.sprints ?? [])].sort(), Object.keys(c).sort().map((k) => [k, c[k].at ?? 0]), raps]);
 };
 
 /** Fusion par tâche : la version la plus récente gagne. L'agenda vient du dépôt, sauf les
- *  clôtures (pour un même sprint, la décision la plus récente l'emporte) et les sprints, réunis. */
+ *  clôtures (pour un même sprint, la décision la plus récente l'emporte), les sprints et les
+ *  rappels, réunis. */
 function merge(remote) {
   const mine = new Map(app.doc.tasks.map((t) => [t.id, t]));
   const out = [];
@@ -587,6 +628,14 @@ function merge(remote) {
     if ((v.at ?? 0) > (cl[k]?.at ?? 0)) cl[k] = v;
   }
   const schedule = { ...rs, sprints: [...new Set([...(rs.sprints ?? []), ...(ls.sprints ?? [])])].sort() };
+  // Rappels : réunis des deux côtés ; pour un même rappel, la modification la plus récente.
+  const raps = new Map();
+  for (const e of [...(rs.events ?? []), ...(ls.events ?? [])].filter((e) => e.rappel === true)) {
+    if (!raps.has(e.id) || (e.at ?? 0) > (raps.get(e.id).at ?? 0)) raps.set(e.id, e);
+  }
+  const old = Date.now() - 30 * 86400000;
+  const kept = [...raps.values()].filter((e) => !(e.deleted && (e.at ?? 0) < old)).sort((a, b) => (a.id < b.id ? -1 : 1));
+  if (kept.length || (rs.events ?? []).length) schedule.events = [...kept, ...(rs.events ?? []).filter((e) => e.rappel !== true)];
   if (Object.keys(cl).length) schedule.closures = cl;
   if (canonSprints({ schedule }) !== canonSprints(remote)) schedule.updatedAt = Math.max(rs.updatedAt ?? 0, ls.updatedAt ?? 0);
   return { ...remote, tasks: out, schedule };

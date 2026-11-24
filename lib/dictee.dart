@@ -1,4 +1,5 @@
-// Dictée : on parle, Bim range. Le premier mot dit où : « note… », « tâche… », « courses… ».
+// Dictée : on parle, Bim range. Le premier mot dit où : « note… », « tâche… », « courses… »,
+// « rappel… » (avec le jour et l'heure dans la phrase).
 // Sans mot-clé, c'est une note. Rien n'est enregistré avant l'appui sur « Enregistrer ».
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 import 'courses.dart';
 import 'models.dart';
 import 'notes.dart';
+import 'rappels.dart';
 import 'store.dart';
 import 'ui.dart';
 
@@ -15,6 +17,7 @@ const _kinds = <String, (String, IconData, Color)>{
   'note': ('Note', Icons.sticky_note_2_rounded, Color(0xFFA855F7)),
   'tache': ('Tâche', Icons.check_circle_rounded, Color(0xFF3B82F6)),
   'courses': ('Courses', Icons.shopping_cart_rounded, Color(0xFF22C55E)),
+  'rappel': ('Rappel', Icons.notifications_active_rounded, rappelColor),
 };
 
 // Mots-clés reconnus au début de la phrase, du plus long au plus court.
@@ -31,7 +34,9 @@ const _words = <(String, String)>[
   ('acheter', 'courses'),
   ('tâche', 'tache'),
   ('tache', 'tache'),
-  ('rappel', 'tache'),
+  ('rappelle-moi de', 'rappel'),
+  ('rappelle-moi', 'rappel'),
+  ('rappel', 'rappel'),
   ('notes', 'note'),
   ('note', 'note'),
   ('mémo', 'note'),
@@ -162,6 +167,14 @@ class _DictationSheetState extends State<DictationSheet> {
           courses.add(a);
         }
         where = l.length > 1 ? '${l.length} articles ajoutés aux courses' : 'Ajouté aux courses';
+      case 'rappel':
+        final r = parseReminder(s);
+        if (r.text.isEmpty) return;
+        final now = DateTime.now();
+        final day = r.day ?? DateTime(now.year, now.month, now.day);
+        final at = r.minutes ?? defaultReminderTime(day);
+        store.saveReminder(null, r.text, day, at);
+        where = 'Rappel ${reminderWhen(day, at)}';
       case 'tache':
         store.add(Task(title: s, domain: 'Personnel', source: 'Dictée'));
         where = 'Tâche ajoutée au backlog';
@@ -199,7 +212,7 @@ class _DictationSheetState extends State<DictationSheet> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(listening ? 'Je t\'écoute…' : 'Dictée',
                 style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
-            Text('Commence par « note », « tâche » ou « courses ».',
+            Text('Commence par « note », « tâche », « courses » ou « rappel ».',
                 style: TextStyle(fontSize: 13, color: p.sub)),
           ]),
         ),
@@ -228,6 +241,19 @@ class _DictationSheetState extends State<DictationSheet> {
                 chosen = true;
               }), color: k.value.$3, icon: k.value.$2),
       ]),
+      if (kind == 'rappel' && text.text.trim().isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: Builder(builder: (context) {
+            final r = parseReminder(text.text);
+            final now = DateTime.now();
+            final day = r.day ?? DateTime(now.year, now.month, now.day);
+            return Text(
+                'Rappel ${reminderWhen(day, r.minutes ?? defaultReminderTime(day))}. '
+                'Dis le jour et l\'heure dans la phrase pour les changer.',
+                style: const TextStyle(color: rappelColor, fontWeight: FontWeight.w700, fontSize: 13.5));
+          }),
+        ),
       if (locked)
         Padding(
           padding: const EdgeInsets.only(top: 10),

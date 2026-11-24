@@ -852,6 +852,49 @@ class Store extends ChangeNotifier {
     _saveSchedule();
   }
 
+  // ---- Rappels ----
+
+  /// Dans Maintenant : les rappels du jour, et ceux d'avant restés sans coche.
+  List<Map<String, dynamic>> get remindersNow {
+    final d = ymd(DateTime.now());
+    return schedule.events
+        .where((e) =>
+            e['rappel'] == true &&
+            e['deleted'] != true &&
+            '${e['date']}'.isNotEmpty &&
+            (e['date'] == d || (e['done'] != true && '${e['date']}'.compareTo(d) < 0)))
+        .toList()
+      ..sort((a, b) => '${a['date']}${'${a['start']}'.padLeft(4, '0')}'
+          .compareTo('${b['date']}${'${b['start']}'.padLeft(4, '0')}'));
+  }
+
+  /// Crée un rappel, ou corrige celui donné.
+  void saveReminder(Map<String, dynamic>? e, String label, DateTime day, int start) {
+    if (e == null) {
+      e = {'id': newId(), 'blockId': null, 'cutEnd': null, 'rappel': true, 'done': false};
+      schedule.events.add(e);
+    }
+    e['label'] = label.trim();
+    e['date'] = ymd(day);
+    e['start'] = start;
+    e['at'] = nowMs();
+    _saveSchedule();
+  }
+
+  void toggleReminder(Map<String, dynamic> e) {
+    e['done'] = e['done'] != true;
+    e['at'] = nowMs();
+    _saveSchedule();
+  }
+
+  /// Supprimé : gardé sans date un mois, pour que la suppression gagne sur les autres appareils.
+  void removeReminder(Map<String, dynamic> e) {
+    e['deleted'] = true;
+    e['date'] = '';
+    e['at'] = nowMs();
+    _saveSchedule();
+  }
+
   /// Heure de fin choisie pour le bloc raccourci par une date ponctuelle.
   void setCut(Map<String, dynamic> event, int minutes) {
     event['cutEnd'] = minutes;
@@ -915,8 +958,17 @@ class Store extends ChangeNotifier {
     // Réglages (blocs, dates, alternance) : le côté le plus récent qui a des blocs.
     final cfg = newer.blocks.isNotEmpty ? newer : (older.blocks.isNotEmpty ? older : newer);
     final other = identical(cfg, l) ? r : l;
+    // Rappels : réunis des deux côtés ; pour un même rappel, la modification la plus récente.
+    final raps = <String, Map<String, dynamic>>{};
+    for (final e in [...l.events, ...r.events].where((e) => e['rappel'] == true)) {
+      final o = raps['${e['id']}'];
+      if (o == null || ((e['at'] ?? 0) as num) > ((o['at'] ?? 0) as num)) raps['${e['id']}'] = e;
+    }
+    final old = nowMs() - 30 * 86400000;
+    raps.removeWhere((_, e) => e['deleted'] == true && ((e['at'] ?? 0) as num) < old);
     final events = [
-      for (final e in cfg.events)
+      ...(raps.values.toList()..sort((a, b) => '${a['id']}'.compareTo('${b['id']}'))),
+      for (final e in cfg.events.where((e) => e['rappel'] != true))
         {
           ...e,
           'cutEnd': newer.events.where((x) => x['id'] == e['id']).firstOrNull?['cutEnd'] ??

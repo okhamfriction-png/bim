@@ -169,8 +169,8 @@
 
     {#if show('agenda')}
       <section class="block">
-        <div class="head"><div><h2>Agenda</h2><span class="muted">Blocs fixes et dates</span></div></div>
-        <Agenda />
+        <div class="head"><div><h2>Agenda</h2><span class="muted">Blocs fixes, dates et rappels</span></div></div>
+        <Agenda {said} />
       </section>
     {/if}
 
