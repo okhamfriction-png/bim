@@ -30,6 +30,14 @@
   <h4>Tâches</h4>
   {#each LISTS as [label, key]}<div class="row"><span>{label}</span><b>{b[key]?.length ?? 0}</b></div>{/each}
 </div>
+{#if b.sante}
+  <div class="box">
+    <h4>Santé <span class="muted">· à part des points du sprint</span></h4>
+    <div class="row"><span>Santé</span><b>{b.sante.p + b.sante.m}/14</b></div>
+    <div class="row"><span>Santé physique</span><b>{b.sante.p}/7</b></div>
+    <div class="row"><span>Santé mentale</span><b>{b.sante.m}/7</b></div>
+  </div>
+{/if}
 {#if full}
   {#if b.keep}<div class="box"><h4>Ce que je retiens</h4><p>{b.keep}</p></div>{/if}
   {#if b.decisions}<div class="box"><h4>Décisions pour le sprint suivant</h4><p>{b.decisions}</p></div>{/if}

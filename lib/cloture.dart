@@ -21,6 +21,10 @@ String _when(int ms) {
 
 String _pts(int n) => '$n pt${n > 1 ? 's' : ''}';
 
+/// « 9/14 » : le score santé figé d'un bilan.
+String santeLabel(Map<String, dynamic> b) =>
+    '${((b['sante']['p'] ?? 0) as num).toInt() + ((b['sante']['m'] ?? 0) as num).toInt()}/14';
+
 void openClose(BuildContext context, String sprint) => Navigator.of(context)
     .push(MaterialPageRoute(fullscreenDialog: true, builder: (_) => ClosePage(sprint)));
 
@@ -391,6 +395,12 @@ class BilanView extends StatelessWidget {
         line('Au parking', '${n('parked')}'),
         line('Abandonnées', '${n('dropped')}', color: n('dropped') > 0 ? prioColors[0] : null),
       ]),
+      if (b['sante'] is Map)
+        Panel(margin: margin, header: const PanelHead('Santé', subtitle: 'À part des points du sprint'), children: [
+          line('Santé', santeLabel(b)),
+          line('Santé physique', '${b['sante']['p']}/7'),
+          line('Santé mentale', '${b['sante']['m']}/7'),
+        ]),
     ]);
   }
 }
@@ -417,7 +427,7 @@ class ClosedLine extends StatelessWidget {
               Text('Sprint du ${sprintRange(sprint)} · clôturé',
                   style: const TextStyle(fontWeight: FontWeight.w800)),
               Text(
-                  '${b['points']} / ${_pts((b['target'] as num).toInt())} · le ${_when((b['closedAt'] as num).toInt())}',
+                  '${b['points']} / ${_pts((b['target'] as num).toInt())}${b['sante'] is Map ? ' · Santé ${santeLabel(b)}' : ''} · le ${_when((b['closedAt'] as num).toInt())}',
                   style: TextStyle(fontSize: 12.5, color: p.sub)),
             ])),
           ),
@@ -568,9 +578,14 @@ class _HistoryPageState extends State<HistoryPage> {
                           padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
                           child: Row(children: [
                             Expanded(
-                              child: Text('Sprint du ${sprintRange(s)}',
-                                  style: const TextStyle(
-                                      fontSize: 15.5, fontWeight: FontWeight.w800)),
+                              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Text('Sprint du ${sprintRange(s)}',
+                                    style: const TextStyle(
+                                        fontSize: 15.5, fontWeight: FontWeight.w800)),
+                                if (store.schedule.closures[s]!['sante'] is Map)
+                                  Text('Santé : ${santeLabel(store.schedule.closures[s]!)}',
+                                      style: TextStyle(fontSize: 12.5, color: p.sub)),
+                              ]),
                             ),
                             Text(
                                 '${store.closedPoints(s)} / ${_pts((store.schedule.closures[s]!['target'] as num).toInt())}',

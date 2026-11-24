@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import 'cloture.dart';
 import 'models.dart';
+import 'sante.dart';
 import 'store.dart';
 import 'ui.dart';
 
@@ -364,6 +365,7 @@ class _KpiPageState extends State<KpiPage> {
                               child:
                                   Text('Rien de terminé sur la période.', style: TextStyle(color: p.sub))),
                       ]),
+                  const SanteKpiView(),
                   Panel(
                       header: const PanelHead('Ce qui reste ouvert',
                           subtitle: 'Hors parking, aujourd\'hui'),

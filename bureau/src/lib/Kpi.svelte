@@ -3,6 +3,7 @@
   import { kpi, median, days } from './kpi.js';
   import { KINDS, CATS, PRIO, dateOf, addDays } from './store.svelte.js';
   import Bars from './Bars.svelte';
+  import SanteKpi from './SanteKpi.svelte';
 
   let weeks = $state(8);
   const k = $derived(kpi(weeks));
@@ -98,6 +99,8 @@
       {/if}
     {/each}
   </div>
+
+  <SanteKpi />
 
   <div class="box">
     <h4>Ce qui reste ouvert <small>Hors parking, aujourd'hui</small></h4>

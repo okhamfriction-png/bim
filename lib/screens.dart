@@ -5,6 +5,7 @@ import 'cloture.dart';
 import 'defi.dart';
 import 'models.dart';
 import 'rappels.dart';
+import 'sante.dart';
 import 'store.dart';
 import 'ui.dart';
 
@@ -243,6 +244,7 @@ class _NowScreenState extends State<NowScreen> {
                 icon: Icons.flag_rounded, color: p.accent, count: '${queue.length}'),
             children: [_DragList(queue, lanes: true)],
           ),
+        if (store.sprints.contains(store.current)) SantePanel(store.current),
       ]),
     );
   }

@@ -231,6 +231,8 @@ export function closureDraft(s, choices) {
     carried: pick('report'),
     parked: pick('parking'),
     dropped: pick('drop'),
+    // Score santé de la semaine : gardé à côté, jamais ajouté aux points.
+    sante: healthIn(s),
   };
 }
 
@@ -423,6 +425,37 @@ export function remindersNow() {
   return (sched().events ?? [])
     .filter((e) => e.rappel === true && !e.deleted && e.date && (e.date === d || (!e.done && e.date < d)))
     .sort((a, b) => (a.date + String(a.start).padStart(4, '0') < b.date + String(b.start).padStart(4, '0') ? -1 : 1));
+}
+// ---- Santé du jour : deux cases par date, à part des points du sprint ----
+// Une fiche par date, rangée avec les rappels pour suivre la même synchro ; sans date d'agenda,
+// elle ne s'affiche nulle part ailleurs. `p` (physique) et `m` (mentale) : true, false ou null.
+const healthOf = (day) => (sched().events ?? []).find((e) => e.sante === day && !e.deleted);
+export const health = (day, k) => healthOf(day)?.[k] ?? null;
+export const healthDays = () => (sched().events ?? []).filter((e) => e.sante && !e.deleted).map((e) => e.sante).sort();
+/** Un appui : vide → tenu → pas tenu → vide. */
+export function cycleHealth(day, k) {
+  const sc = (app.doc.schedule ??= {});
+  let e = healthOf(day);
+  if (!e) {
+    sc.events = [...(sc.events ?? []), {
+      id: `sante-${day}`, date: '', start: 0, label: '', blockId: null, cutEnd: null,
+      rappel: true, done: true, sante: day, p: null, m: null,
+    }];
+    e = sc.events.at(-1);
+  }
+  const v = e[k] ?? null;
+  e[k] = v === null ? true : v === true ? false : null;
+  touchReminder(e);
+}
+/** Cases tenues dans la semaine du sprint : 7 chacune au plus. */
+export function healthIn(sprint) {
+  const out = { p: 0, m: 0 };
+  for (let i = 0; i < 7; i++) {
+    const d = ymd(addDays(dateOf(sprint), i));
+    if (health(d, 'p') === true) out.p++;
+    if (health(d, 'm') === true) out.m++;
+  }
+  return out;
 }
 function touchReminder(e) {
   e.at = Date.now();

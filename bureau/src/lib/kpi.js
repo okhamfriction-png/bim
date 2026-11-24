@@ -2,7 +2,7 @@
 // et des clôtures. Rien n'est enregistré ici.
 import {
   app, kindOf, coefOf, plannedOf, catOf, parked, sprintOf, current, thisMonday, closedSprints,
-  closureOf, mondayOf, addDays, dateOf, whole, PRIO,
+  closureOf, mondayOf, addDays, dateOf, whole, PRIO, ymd, health, healthDays,
 } from './store.svelte.js';
 
 const DAY = 86400000;
@@ -101,5 +101,60 @@ export function kpi(weeks) {
   k.totalCreated = sum(k.created);
   k.totalDropped = sum(k.dropped);
   k.totalPoints = sum(k.points.map((w) => sum(Object.values(w))));
+  return k;
+}
+
+/** Section « Santé » : jours tenus par semaine sur 8 semaines, séries, croisement avec la rue. */
+export function santeKpi() {
+  const weeks = 8;
+  const today = new Date(app.now);
+  today.setHours(0, 0, 0, 0);
+  const m0 = mondayOf(today);
+  const k = { mondays: [], p: [], m: [], both: [], streak: {}, best: {} };
+  for (let i = weeks - 1; i >= 0; i--) {
+    const mo = addDays(m0, -7 * i);
+    k.mondays.push(mo);
+    let a = 0, b = 0, c = 0;
+    for (let j = 0; j < 7; j++) {
+      const d = ymd(addDays(mo, j));
+      const x = health(d, 'p') === true, y = health(d, 'm') === true;
+      a += x; b += y; c += x && y;
+    }
+    k.p.push(a); k.m.push(b); k.both.push(c);
+  }
+  const all = healthDays();
+  for (const key of ['p', 'm']) {
+    // En cours : on remonte depuis aujourd'hui (ou hier si aujourd'hui n'est pas renseigné).
+    let d = health(ymd(today), key) === null ? addDays(today, -1) : today;
+    let n = 0;
+    while (health(ymd(d), key) === true) { n++; d = addDays(d, -1); }
+    k.streak[key] = n;
+    let top = 0, run = 0;
+    if (all.length) {
+      for (let x = dateOf(all[0]); x <= today; x = addDays(x, 1)) {
+        run = health(ymd(x), key) === true ? run + 1 : 0;
+        top = Math.max(top, run);
+      }
+    }
+    k.best[key] = top;
+  }
+  // Approches notées par jour (le jour où le bloc de rue a été coché).
+  const rue = {};
+  for (const t of app.doc.tasks) {
+    if (t.deleted || kindOf(t) !== 'rue') continue;
+    for (const s of subs(t)) {
+      if (s.data?.approches == null || !s.doneAt) continue;
+      const d = ymd(new Date(s.doneAt));
+      rue[d] = (rue[d] ?? 0) + s.data.approches;
+    }
+  }
+  const held = [], missed = [];
+  for (const [d, n] of Object.entries(rue)) {
+    const v = health(d, 'm');
+    if (v === true) held.push(n);
+    if (v === false) missed.push(n);
+  }
+  const avg = (l) => (l.length ? l.reduce((a, b) => a + b, 0) / l.length : 0);
+  k.rue = { held: [held.length, avg(held)], missed: [missed.length, avg(missed)] };
   return k;
 }

@@ -323,6 +323,8 @@ class Store extends ChangeNotifier {
       'carried': pick('report'),
       'parked': pick('parking'),
       'dropped': pick('drop'),
+      // Score santé de la semaine : gardé à côté, jamais ajouté aux points.
+      'sante': {'p': healthIn(s).$1, 'm': healthIn(s).$2},
     };
   }
 
@@ -894,6 +896,44 @@ class Store extends ChangeNotifier {
     e['date'] = '';
     e['at'] = nowMs();
     _saveSchedule();
+  }
+
+  // ---- Santé du jour : deux cases par date, à part des points du sprint ----
+  // Une fiche par date, rangée avec les rappels pour suivre la même synchro : sans date
+  // d'agenda, elle ne s'affiche nulle part ailleurs. `p` (physique) et `m` (mentale) valent
+  // true (tenu), false (pas tenu) ou null (pas renseigné).
+
+  Map<String, dynamic>? _healthOf(String day) =>
+      schedule.events.where((e) => e['sante'] == day && e['deleted'] != true).firstOrNull;
+
+  bool? health(String day, String k) => _healthOf(day)?[k] as bool?;
+
+  /// Un appui : vide → tenu → pas tenu → vide.
+  void cycleHealth(String day, String k) {
+    var e = _healthOf(day);
+    if (e == null) {
+      e = {
+        'id': 'sante-$day', 'date': '', 'start': 0, 'label': '', 'blockId': null,
+        'cutEnd': null, 'rappel': true, 'done': true, 'sante': day, 'p': null, 'm': null,
+      };
+      schedule.events.add(e);
+    }
+    final v = e[k];
+    e[k] = v == null ? true : (v == true ? false : null);
+    e['at'] = nowMs();
+    _saveSchedule();
+  }
+
+  /// Cases tenues dans la semaine du sprint : (physique, mentale). 7 chacune au plus.
+  (int, int) healthIn(String sprint) {
+    final d0 = dateOf(sprint);
+    var a = 0, b = 0;
+    for (var i = 0; i < 7; i++) {
+      final d = ymd(DateTime(d0.year, d0.month, d0.day + i));
+      if (health(d, 'p') == true) a++;
+      if (health(d, 'm') == true) b++;
+    }
+    return (a, b);
   }
 
   /// Heure de fin choisie pour le bloc raccourci par une date ponctuelle.

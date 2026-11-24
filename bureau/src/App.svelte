@@ -7,6 +7,7 @@
   import Cloture from './lib/Cloture.svelte';
   import Historique from './lib/Historique.svelte';
   import Kpi from './lib/Kpi.svelte';
+  import Sante from './lib/Sante.svelte';
   import Dictee from './lib/Dictee.svelte';
   import Lanes from './lib/Lanes.svelte';
   import Task from './lib/Task.svelte';
@@ -131,7 +132,7 @@
         </div>
         {#if lastClosed}
           <div class="sub closed">
-            <span>🔒 <b>Sprint du {fmtLong.format(dateOf(lastClosed))} clôturé</b> · {closureOf(lastClosed).points} / {closureOf(lastClosed).target} pts</span>
+            <span>🔒 <b>Sprint du {fmtLong.format(dateOf(lastClosed))} clôturé</b> · {closureOf(lastClosed).points} / {closureOf(lastClosed).target} pts{closureOf(lastClosed).sante ? ` · Santé ${closureOf(lastClosed).sante.p + closureOf(lastClosed).sante.m}/14` : ''}</span>
             <button class="btn" onclick={() => (history = true)}>Historique</button>
           </div>
         {/if}
@@ -145,6 +146,7 @@
               {#each doneThisWeek() as t (t.id)}<Task {t} drag={false} />{/each}
             {/if}
           {/if}
+          <Sante sprint={cur} />
         </div>
       </section>
     {/if}

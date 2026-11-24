@@ -54,7 +54,7 @@
       {#each all as s (s)}
         <button class="sprint" onclick={() => (open = shown === s ? '' : s)}>
           <b>Sprint du {range(s)}</b>
-          <span>{closedPoints(s)} / {closureOf(s).target} pts {shown === s ? '▾' : '▸'}</span>
+          <span>{closedPoints(s)} / {closureOf(s).target} pts{closureOf(s).sante ? ` · Santé ${closureOf(s).sante.p + closureOf(s).sante.m}/14` : ''} {shown === s ? '▾' : '▸'}</span>
         </button>
         {#if shown === s}
           <Bilan b={closureOf(s)} full />

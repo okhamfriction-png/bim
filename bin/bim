@@ -336,7 +336,7 @@ def cmd_rappel(a):
     """Rappels de l'agenda : un repère à l'heure dite, pas un créneau."""
     def alive(doc):
         return [e for e in doc.get("schedule", {}).get("events", [])
-                if e.get("rappel") and not e.get("deleted")]
+                if e.get("rappel") and not e.get("deleted") and not e.get("sante")]
 
     if a.fait:
         key = a.fait.strip().lower()
