@@ -8,7 +8,7 @@
   const k = $derived(kpi(weeks));
   const labels = $derived(k.mondays.map((m) => `${m.getDate()}/${m.getMonth() + 1}`));
   const rate = $derived(k.totalCreated ? Math.round((100 * k.totalDone) / k.totalCreated) : null);
-  const KIND_COLOR = { rue: '#f59e0b', paris: '#ef4444', montee: '#a855f7', short: '#0ea5e9', rangement: '#22c55e', echauffement: '#f97316' };
+  const KIND_COLOR = { rue: '#f59e0b', paris: '#ef4444', montee: '#a855f7', short: '#0ea5e9', rangement: '#22c55e', recap: '#14b8a6', echauffement: '#f97316' };
   const CAT_COLOR = { Mission: '#3b82f6', Contenu: '#f59e0b', Destiny: '#a855f7', Personnel: '#22c55e', Parking: '#94a3b8' };
   const usedKinds = $derived(Object.keys(KINDS).filter((x) => k.points.some((w) => (w[x] ?? 0) > 0)));
   const fmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long' });

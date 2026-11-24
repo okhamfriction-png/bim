@@ -62,6 +62,7 @@ const kindIcons = <String, IconData>{
   'montee': Icons.movie_edit,
   'short': Icons.smartphone_rounded,
   'rangement': Icons.inventory_2_rounded,
+  'recap': Icons.fact_check_rounded,
   'echauffement': Icons.local_fire_department_rounded,
 };
 

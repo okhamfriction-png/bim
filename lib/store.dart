@@ -277,12 +277,13 @@ class Store extends ChangeNotifier {
   }
 
   /// Catégories de points du bilan (les deux types de vidéo comptent ensemble).
-  static const bilanCats = ['Rue', 'Vidéo', 'Short', 'Rangement', 'Échauffement'];
+  static const bilanCats = ['Rue', 'Vidéo', 'Short', 'Rangement', 'Récap', 'Échauffement'];
   static String bilanCat(Task t) => switch (t.kindOf) {
         'rue' => 'Rue',
         'paris' || 'montee' => 'Vidéo',
         'short' => 'Short',
         'rangement' => 'Rangement',
+        'recap' => 'Récap',
         'echauffement' => 'Échauffement',
         _ => '',
       };

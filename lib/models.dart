@@ -28,6 +28,7 @@ const kinds = <String, (String, String, int)>{
   'montee': ('Vidéo montée', 'vidéos', 2),
   'short': ('Short', 'shorts', 1),
   'rangement': ('Rangement', 'jours', 1),
+  'recap': ('Récap', 'récaps', 3),
   'echauffement': ('Échauffement', 'sprints', 2),
 };
 
@@ -224,6 +225,7 @@ class Task {
     if (s.startsWith('vidéo montée')) return 'montee';
     if (s.startsWith('short ·')) return 'short';
     if (s.startsWith('rangement ·')) return 'rangement';
+    if (s.startsWith('récap ·')) return 'recap';
     if (s.startsWith('échauffement ·')) return 'echauffement';
     return '';
   }

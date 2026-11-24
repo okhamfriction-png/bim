@@ -12,6 +12,7 @@ export const KINDS = {
   montee: { name: 'Vidéo montée', unit: 'vidéos', icon: '🎬', coef: 2 },
   short: { name: 'Short', unit: 'shorts', icon: '📱', coef: 1 },
   rangement: { name: 'Rangement', unit: 'jours', icon: '🗂️', coef: 1 },
+  recap: { name: 'Récap', unit: 'récaps', icon: '📋', coef: 3 },
   echauffement: { name: 'Échauffement', unit: 'sprints', icon: '🔥', coef: 2 },
 };
 /** Types payés une seule fois, quand la tâche entière est validée. */
@@ -90,6 +91,7 @@ export function kindOf(t) {
   if (s.startsWith('vidéo montée')) return 'montee';
   if (s.startsWith('short ·')) return 'short';
   if (s.startsWith('rangement ·')) return 'rangement';
+  if (s.startsWith('récap ·')) return 'recap';
   if (s.startsWith('échauffement ·')) return 'echauffement';
   return '';
 }
@@ -201,9 +203,9 @@ export const nextSprint = (s) => {
 /** Terminée pour de bon : cochée, et toutes ses sous-tâches aussi. */
 export const isComplete = (t) => t.status === 'done' && subs(t).every((x) => x.done);
 export const reportsOf = (t) => t.meta?.reports ?? 0;
-export const BILAN_CATS = ['Rue', 'Vidéo', 'Short', 'Rangement', 'Échauffement'];
+export const BILAN_CATS = ['Rue', 'Vidéo', 'Short', 'Rangement', 'Récap', 'Échauffement'];
 const bilanCat = (t) =>
-  ({ rue: 'Rue', paris: 'Vidéo', montee: 'Vidéo', short: 'Short', rangement: 'Rangement', echauffement: 'Échauffement' })[kindOf(t)] ?? '';
+  ({ rue: 'Rue', paris: 'Vidéo', montee: 'Vidéo', short: 'Short', rangement: 'Rangement', recap: 'Récap', echauffement: 'Échauffement' })[kindOf(t)] ?? '';
 export const sprintComplete = (s) =>
   app.doc.tasks.filter((t) => !t.deleted && t.sprint === s && isComplete(t)).sort(order);
 export const sprintUnfinished = (s) =>

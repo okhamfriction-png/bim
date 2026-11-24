@@ -19,6 +19,7 @@ const kindColors = <String, Color>{
   'montee': Color(0xFFA855F7),
   'short': Color(0xFF0EA5E9),
   'rangement': Color(0xFF22C55E),
+  'recap': Color(0xFF14B8A6),
   'echauffement': Color(0xFFF97316),
 };
 
