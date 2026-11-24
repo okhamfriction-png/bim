@@ -1,14 +1,13 @@
 <script>
   // Un panier de basket à chaque point gagné (points du sprint, ou case Santé tenue).
   import { untrack } from 'svelte';
-  import { app, valueWeek, healthIn, current } from './store.svelte.js';
+  import { app, valueWeek, healthTotal, current } from './store.svelte.js';
 
   let shot = $state(null); // { id, text }
   let prev = null, prevH = null, n = 0, timer;
   $effect(() => {
     const v = valueWeek();
-    const h = healthIn(current());
-    const hs = h.p + h.m;
+    const hs = healthTotal(current());
     // Pas de panier pour des points arrivés par la synchro d'un autre appareil.
     const quiet = untrack(() => app.sync === 'sync');
     if (prev !== null && !quiet) {

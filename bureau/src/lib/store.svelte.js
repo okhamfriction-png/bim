@@ -439,7 +439,7 @@ export function cycleHealth(day, k) {
   if (!e) {
     sc.events = [...(sc.events ?? []), {
       id: `sante-${day}`, date: '', start: 0, label: '', blockId: null, cutEnd: null,
-      rappel: true, done: true, sante: day, p: null, m: null,
+      rappel: true, done: true, sante: day,
     }];
     e = sc.events.at(-1);
   }
@@ -447,16 +447,27 @@ export function cycleHealth(day, k) {
   e[k] = v === null ? true : v === true ? false : null;
   touchReminder(e);
 }
-/** Cases tenues dans la semaine du sprint : 7 chacune au plus. */
+/** Colonnes de la santé du jour : [clé enregistrée, libellé, couleur, icône de la colonne]. */
+export const HEALTH = [
+  ['p', 'Santé physique', '#22c55e', '❤️'],
+  ['m', 'Santé mentale', '#8b5cf6', '🧠'],
+  ['r', 'Réveil', '#f59e0b', '⏰'],
+  ['l', 'Lecture', '#0ea5e9', '📖'],
+  ['t', 'Téléphone', '#14b8a6', '📱'],
+];
+/** Cases tenues dans la semaine du sprint, par colonne : 7 chacune au plus. */
 export function healthIn(sprint) {
-  const out = { p: 0, m: 0 };
+  const out = Object.fromEntries(HEALTH.map(([k]) => [k, 0]));
   for (let i = 0; i < 7; i++) {
     const d = ymd(addDays(dateOf(sprint), i));
-    if (health(d, 'p') === true) out.p++;
-    if (health(d, 'm') === true) out.m++;
+    for (const [k] of HEALTH) if (health(d, k) === true) out[k]++;
   }
   return out;
 }
+export const healthTotal = (sprint) => Object.values(healthIn(sprint)).reduce((a, b) => a + b, 0);
+/** « 9/35 » : le score santé figé d'un bilan, sur 7 jours par colonne suivie à la clôture. */
+export const santeLabel = (b) =>
+  `${Object.values(b.sante).reduce((a, v) => a + (v ?? 0), 0)}/${7 * Object.keys(b.sante).length}`;
 function touchReminder(e) {
   e.at = Date.now();
   app.doc.schedule.updatedAt = e.at;

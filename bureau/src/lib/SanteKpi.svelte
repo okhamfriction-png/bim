@@ -1,9 +1,10 @@
 <script>
   // Section « Santé » du tableau de bord (lib/sante.dart, SanteKpiView).
   import { santeKpi } from './kpi.js';
+  import { HEALTH } from './store.svelte.js';
 
   const k = $derived(santeKpi());
-  const KEYS = [['p', 'Santé physique', '#22c55e'], ['m', 'Santé mentale', '#8b5cf6']];
+  const KEYS = HEALTH;
   const fmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long' });
   const enough = $derived(k.rue.held[0] >= 5 && k.rue.missed[0] >= 5);
   const avg = (g) => (g[0] ? g[1].toFixed(1).replace('.', ',') : '–');
@@ -15,10 +16,10 @@
 
 <div class="box">
   <h4>❤️ Santé <small>Jours tenus sur 7, par semaine</small></h4>
-  <div class="grid head"><span>Semaine du</span><span style="color: #22c55e">Santé physique</span><span style="color: #8b5cf6">Santé mentale</span><span>Les deux</span></div>
+  <div class="grid wide head"><span>Semaine du</span>{#each KEYS as [, name, , icon]}<span class="ico" title={name} role="img" aria-label={name}>{icon}</span>{/each}<span>Tous</span></div>
   {#each k.mondays.toReversed() as mo, r}
     {@const i = k.mondays.length - 1 - r}
-    <div class="grid" class:now={r === 0}><span>{fmt.format(mo)}</span><b>{k.p[i]}/7</b><b>{k.m[i]}/7</b><b>{k.both[i]}/7</b></div>
+    <div class="grid wide" class:now={r === 0}><span>{fmt.format(mo)}</span>{#each KEYS as [key]}<b>{k.by[key][i]}/7</b>{/each}<b>{k.every[i]}/7</b></div>
   {/each}
 </div>
 
@@ -36,8 +37,8 @@
     {#each [0, 7] as v}<line x1={L} x2={W} y1={y(v)} y2={y(v)} class="axis" /><text x="8" y={y(v) + 4}>{v}</text>{/each}
     {#each k.mondays as mo, i}<text x={x(i)} y={H - 4}>{mo.getDate()}/{mo.getMonth() + 1}</text>{/each}
     {#each KEYS as [key, , color]}
-      <path d={path(k[key])} style="stroke: {color}" />
-      {#each k[key] as v, i}<circle cx={x(i)} cy={y(v)} r="3.5" style="fill: {color}" />{/each}
+      <path d={path(k.by[key])} style="stroke: {color}" />
+      {#each k.by[key] as v, i}<circle cx={x(i)} cy={y(v)} r="3.5" style="fill: {color}" />{/each}
     {/each}
   </svg>
   <p class="legend">{#each KEYS as [, name, color]}<i style="background: {color}"></i>{name} {/each}</p>
@@ -57,8 +58,10 @@
   h4 small { display: block; font-weight: 500; color: var(--sub); font-size: 12.5px; }
   .grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; padding: 7px 14px; border-top: 1px solid var(--line); text-align: center; }
   .grid.three { grid-template-columns: 1.4fr 1fr 1fr; }
+  .grid.wide { grid-template-columns: 1.3fr repeat(6, 1fr); font-size: 13px; }
   .grid > :first-child { text-align: left; }
   .grid.head { font-size: 12.5px; font-weight: 800; color: var(--sub); }
+  .ico { font-size: 18px; line-height: 1; }
   .grid.now { background: color-mix(in srgb, #ec4899 8%, transparent); }
   .grid.now > :first-child { font-weight: 800; }
   svg { display: block; width: 100%; padding: 12px 12px 4px; }

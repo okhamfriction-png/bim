@@ -11,7 +11,14 @@ import 'ui.dart';
 const santeColor = Color(0xFFEC4899);
 const santeP = Color(0xFF22C55E); // physique
 const santeM = Color(0xFF8B5CF6); // mentale
-const _keys = [('p', 'Santé physique', santeP), ('m', 'Santé mentale', santeM)];
+// Colonnes : (clé, libellé, couleur, icône affichée en tête de colonne).
+const _keys = [
+  ('p', 'Santé physique', santeP, Icons.favorite_rounded),
+  ('m', 'Santé mentale', santeM, Icons.psychology_rounded),
+  ('r', 'Réveil', Color(0xFFF59E0B), Icons.alarm_rounded),
+  ('l', 'Lecture', Color(0xFF0EA5E9), Icons.menu_book_rounded),
+  ('t', 'Téléphone', Color(0xFF14B8A6), Icons.smartphone_rounded),
+];
 const _short = ['Lun.', 'Mar.', 'Mer.', 'Jeu.', 'Ven.', 'Sam.', 'Dim.'];
 
 DateTime _plus(DateTime d, int n) => DateTime(d.year, d.month, d.day + n);
@@ -67,7 +74,7 @@ class _SantePanelState extends State<SantePanel> {
     final sprint = widget.sprint;
     final d0 = dateOf(sprint);
     final today = ymd(DateTime.now());
-    final (a, b) = store.healthIn(sprint);
+    final total = store.healthTotal(sprint);
     // Aujourd'hui hors de cette semaine : rien à replier sur le jour, on montre tout.
     final inWeek = [for (var i = 0; i < 7; i++) ymd(_plus(d0, i))].contains(today);
     return Panel(
@@ -78,7 +85,7 @@ class _SantePanelState extends State<SantePanel> {
             subtitle: 'Est-ce que j\'ai tenu ?',
             icon: Icons.favorite_rounded,
             color: santeColor,
-            count: 'Santé : ${a + b}/14',
+            count: 'Santé : $total/${7 * _keys.length}',
             trailing: Icon(open ? Icons.expand_less_rounded : Icons.expand_more_rounded,
                 color: p.sub)),
       ),
@@ -86,12 +93,10 @@ class _SantePanelState extends State<SantePanel> {
         Padding(
           padding: const EdgeInsets.fromLTRB(14, 8, 8, 6),
           child: Row(children: [
-            const SizedBox(width: 76),
+            const SizedBox(width: 62),
             for (final k in _keys)
               Expanded(
-                child: Text(k.$2,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: p.sub)),
+                child: Tooltip(message: k.$2, child: Icon(k.$4, size: 24, color: k.$3)),
               ),
           ]),
         ),
@@ -109,7 +114,7 @@ class _SantePanelState extends State<SantePanel> {
                 padding: const EdgeInsets.only(left: 14, right: 8),
                 child: Row(children: [
                   SizedBox(
-                    width: 76,
+                    width: 62,
                     child: Text('${_short[i]} ${day.day}',
                         style: TextStyle(
                             fontSize: 14.5,
@@ -141,7 +146,8 @@ class _SantePanelState extends State<SantePanel> {
 class SanteKpi {
   static const weeks = 8;
   final List<DateTime> mondays = [];
-  final List<int> p = [], m = [], both = []; // jours tenus par semaine
+  final Map<String, List<int>> by = {for (final k in _keys) k.$1: []}; // jours tenus par semaine
+  final List<int> all = []; // jours où toutes les cases sont tenues
   final Map<String, int> streak = {}, best = {}; // série en cours et meilleure série, par case
   // Approches de rue les jours « mentale tenue » et « pas tenue » : (jours, moyenne).
   (int, double) rueHeld = (0, 0), rueMissed = (0, 0);
@@ -153,23 +159,31 @@ class SanteKpi {
     for (var i = weeks - 1; i >= 0; i--) {
       final mo = _plus(m0, -7 * i);
       mondays.add(mo);
-      var a = 0, b = 0, c = 0;
+      final n = {for (final k in _keys) k.$1: 0};
+      var c = 0;
       for (var j = 0; j < 7; j++) {
         final d = ymd(_plus(mo, j));
-        final x = store.health(d, 'p') == true, y = store.health(d, 'm') == true;
-        if (x) a++;
-        if (y) b++;
-        if (x && y) c++;
+        var every = true;
+        for (final k in _keys) {
+          if (store.health(d, k.$1) == true) {
+            n[k.$1] = n[k.$1]! + 1;
+          } else {
+            every = false;
+          }
+        }
+        if (every) c++;
       }
-      p.add(a);
-      m.add(b);
-      both.add(c);
+      for (final k in _keys) {
+        by[k.$1]!.add(n[k.$1]!);
+      }
+      all.add(c);
     }
     final days = [
       for (final e in store.schedule.events)
         if (e['sante'] is String && e['deleted'] != true) e['sante'] as String
     ]..sort();
-    for (final k in ['p', 'm']) {
+    for (final key in _keys) {
+      final k = key.$1;
       // En cours : on remonte depuis aujourd'hui (ou hier si aujourd'hui n'est pas renseigné).
       var d = store.health(ymd(today), k) == null ? _plus(today, -1) : today;
       var n = 0;
@@ -221,15 +235,18 @@ class SanteKpiView extends StatelessWidget {
     Widget cell(String s, {Color? color, bool bold = true, TextAlign align = TextAlign.center}) =>
         Text(s,
             textAlign: align,
+            maxLines: 1,
+            softWrap: false,
+            overflow: TextOverflow.clip,
             style: TextStyle(
-                fontSize: 13.5,
+                fontSize: 12.5,
                 fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
                 color: color ?? p.ink));
-    Widget row(List<Widget> c, {Color? bg}) => Container(
+    Widget row(List<Widget> c, {Color? bg, int first = 3}) => Container(
           color: bg,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           child: Row(children: [
-            Expanded(flex: 3, child: c[0]),
+            Expanded(flex: first, child: c[0]),
             for (final w in c.skip(1)) Expanded(flex: 2, child: w),
           ]),
         );
@@ -244,18 +261,16 @@ class SanteKpiView extends StatelessWidget {
             color: santeColor),
         children: [
           row([
-            cell('Semaine du', color: p.sub, align: TextAlign.left),
-            cell('Santé\nphysique', color: santeP),
-            cell('Santé\nmentale', color: santeM),
-            cell('Les deux', color: p.sub),
+            cell('Sem.', color: p.sub, align: TextAlign.left),
+            for (final x in _keys) Tooltip(message: x.$2, child: Icon(x.$4, size: 19, color: x.$3)),
+            cell('Tous', color: p.sub),
           ]),
           for (var i = SanteKpi.weeks - 1; i >= 0; i--)
             row([
-              cell('${k.mondays[i].day} ${monthNames[k.mondays[i].month - 1]}',
+              cell('${k.mondays[i].day}/${k.mondays[i].month}',
                   bold: i == SanteKpi.weeks - 1, align: TextAlign.left),
-              cell('${k.p[i]}/7'),
-              cell('${k.m[i]}/7'),
-              cell('${k.both[i]}/7'),
+              for (final x in _keys) cell('${k.by[x.$1]![i]}'),
+              cell('${k.all[i]}'),
             ], bg: i == SanteKpi.weeks - 1 ? santeColor.withValues(alpha: .08) : null),
         ],
       ),
@@ -280,12 +295,13 @@ class SanteKpiView extends StatelessWidget {
             child: SizedBox(
                 height: 160,
                 child: CustomPaint(
-                    painter: _Lines([k.p, k.m], const [santeP, santeM],
+                    painter: _Lines([for (final x in _keys) k.by[x.$1]!],
+                        [for (final x in _keys) x.$3],
                         [for (final mo in k.mondays) '${mo.day}/${mo.month}'], p))),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 4, 14, 10),
-            child: Wrap(spacing: 14, children: [
+            child: Wrap(spacing: 14, runSpacing: 4, children: [
               for (final x in _keys)
                 Row(mainAxisSize: MainAxisSize.min, children: [
                   Container(

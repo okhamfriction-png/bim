@@ -1,6 +1,6 @@
 <script>
   // Le bilan chiffré d'un sprint : brouillon avant la clôture, ou bilan figé (avec `full`).
-  import { BILAN_CATS } from './store.svelte.js';
+  import { BILAN_CATS, HEALTH, santeLabel } from './store.svelte.js';
 
   let { b, full = false } = $props();
   const pts = (n) => `${n} pt${n > 1 ? 's' : ''}`;
@@ -33,9 +33,8 @@
 {#if b.sante}
   <div class="box">
     <h4>Santé <span class="muted">· à part des points du sprint</span></h4>
-    <div class="row"><span>Santé</span><b>{b.sante.p + b.sante.m}/14</b></div>
-    <div class="row"><span>Santé physique</span><b>{b.sante.p}/7</b></div>
-    <div class="row"><span>Santé mentale</span><b>{b.sante.m}/7</b></div>
+    <div class="row"><span>Santé</span><b>{santeLabel(b)}</b></div>
+    {#each HEALTH.filter(([k]) => k in b.sante) as [k, name]}<div class="row"><span>{name}</span><b>{b.sante[k]}/7</b></div>{/each}
   </div>
 {/if}
 {#if full}

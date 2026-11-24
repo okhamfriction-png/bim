@@ -19,8 +19,7 @@ class _PanierOverlayState extends State<PanierOverlay> with SingleTickerProvider
 
   int get _health {
     if (!store.sprints.contains(store.current)) return 0;
-    final (a, b) = store.healthIn(store.current);
-    return a + b;
+    return store.healthTotal(store.current);
   }
 
   void _watch() {

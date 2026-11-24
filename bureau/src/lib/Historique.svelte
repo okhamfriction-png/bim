@@ -1,6 +1,7 @@
 <script>
   // Sprints clôturés : la courbe de vélocité, puis chaque sprint avec son bilan figé.
-  import { closedSprints, closureOf, closedPoints, velocity, velocityLabel, reopenSprint, dateOf, addDays } from './store.svelte.js';
+  import { closedSprints, closureOf, closedPoints, velocity, velocityLabel, reopenSprint, dateOf, addDays, santeLabel,
+  } from './store.svelte.js';
   import Bilan from './Bilan.svelte';
 
   let { close } = $props();
@@ -54,7 +55,7 @@
       {#each all as s (s)}
         <button class="sprint" onclick={() => (open = shown === s ? '' : s)}>
           <b>Sprint du {range(s)}</b>
-          <span>{closedPoints(s)} / {closureOf(s).target} pts{closureOf(s).sante ? ` · Santé ${closureOf(s).sante.p + closureOf(s).sante.m}/14` : ''} {shown === s ? '▾' : '▸'}</span>
+          <span>{closedPoints(s)} / {closureOf(s).target} pts{closureOf(s).sante ? ` · Santé ${santeLabel(closureOf(s))}` : ''} {shown === s ? '▾' : '▸'}</span>
         </button>
         {#if shown === s}
           <Bilan b={closureOf(s)} full />

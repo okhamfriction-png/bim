@@ -1,7 +1,7 @@
 <script>
   import {
     app, sync, thisMonday, sprints, sprintTasks, looseTasks, doneThisWeek, dateOf, addDays,
-    valueWeek, valueToday, healthIn, bonus, BONUS_EVERY, targetOf, plannedIn, p0In,
+    valueWeek, valueToday, healthTotal, HEALTH, santeLabel, bonus, BONUS_EVERY, targetOf, plannedIn, p0In,
     current, closedSprints, closureOf, velocityLabel, saveUi,
   } from './lib/store.svelte.js';
   import Cloture from './lib/Cloture.svelte';
@@ -70,7 +70,7 @@
   const cur = $derived(current());
   const target = $derived(targetOf(cur));
   const value = $derived(valueWeek());
-  const sante = $derived(healthIn(cur));
+  const sante = $derived(healthTotal(cur));
   const tokens = $derived(bonus());
   const fmtDate = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
   const fmtShort = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' });
@@ -139,11 +139,11 @@
             <div class="bar"><i style="width: {target ? Math.min(100, (100 * value) / target) : 0}%"></i></div>
             <small>+{valueToday()} aujourd'hui · reste {Math.max(0, target - value)} pour la cible</small>
           </div>
-          <span class="chip">❤️ Santé {sante.p + sante.m}/14</span>
+          <span class="chip">❤️ Santé {sante}/{7 * HEALTH.length}</span>
         </div>
         {#if lastClosed}
           <div class="sub closed">
-            <span>🔒 <b>Sprint du {fmtLong.format(dateOf(lastClosed))} clôturé</b> · {closureOf(lastClosed).points} / {closureOf(lastClosed).target} pts{closureOf(lastClosed).sante ? ` · Santé ${closureOf(lastClosed).sante.p + closureOf(lastClosed).sante.m}/14` : ''}</span>
+            <span>🔒 <b>Sprint du {fmtLong.format(dateOf(lastClosed))} clôturé</b> · {closureOf(lastClosed).points} / {closureOf(lastClosed).target} pts{closureOf(lastClosed).sante ? ` · Santé ${santeLabel(closureOf(lastClosed))}` : ''}</span>
             <button class="btn" onclick={() => (history = true)}>Historique</button>
           </div>
         {/if}

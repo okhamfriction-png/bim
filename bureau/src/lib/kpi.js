@@ -2,7 +2,7 @@
 // et des clôtures. Rien n'est enregistré ici.
 import {
   app, kindOf, coefOf, plannedOf, catOf, parked, sprintOf, current, thisMonday, closedSprints,
-  closureOf, mondayOf, addDays, dateOf, whole, PRIO, ymd, health, healthDays,
+  closureOf, mondayOf, addDays, dateOf, whole, PRIO, ymd, health, healthDays, HEALTH,
 } from './store.svelte.js';
 
 const DAY = 86400000;
@@ -110,20 +110,27 @@ export function santeKpi() {
   const today = new Date(app.now);
   today.setHours(0, 0, 0, 0);
   const m0 = mondayOf(today);
-  const k = { mondays: [], p: [], m: [], both: [], streak: {}, best: {} };
+  const keys = HEALTH.map(([x]) => x);
+  const k = { mondays: [], by: Object.fromEntries(keys.map((x) => [x, []])), every: [], streak: {}, best: {} };
   for (let i = weeks - 1; i >= 0; i--) {
     const mo = addDays(m0, -7 * i);
     k.mondays.push(mo);
-    let a = 0, b = 0, c = 0;
+    const n = Object.fromEntries(keys.map((x) => [x, 0]));
+    let c = 0;
     for (let j = 0; j < 7; j++) {
       const d = ymd(addDays(mo, j));
-      const x = health(d, 'p') === true, y = health(d, 'm') === true;
-      a += x; b += y; c += x && y;
+      let every = true;
+      for (const x of keys) {
+        if (health(d, x) === true) n[x]++;
+        else every = false;
+      }
+      c += every;
     }
-    k.p.push(a); k.m.push(b); k.both.push(c);
+    for (const x of keys) k.by[x].push(n[x]);
+    k.every.push(c);
   }
   const all = healthDays();
-  for (const key of ['p', 'm']) {
+  for (const key of keys) {
     // En cours : on remonte depuis aujourd'hui (ou hier si aujourd'hui n'est pas renseigné).
     let d = health(ymd(today), key) === null ? addDays(today, -1) : today;
     let n = 0;

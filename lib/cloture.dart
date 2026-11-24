@@ -21,9 +21,12 @@ String _when(int ms) {
 
 String _pts(int n) => '$n pt${n > 1 ? 's' : ''}';
 
-/// « 9/14 » : le score santé figé d'un bilan.
-String santeLabel(Map<String, dynamic> b) =>
-    '${((b['sante']['p'] ?? 0) as num).toInt() + ((b['sante']['m'] ?? 0) as num).toInt()}/14';
+/// « 9/35 » : le score santé figé d'un bilan, sur 7 jours par colonne suivie à la clôture.
+String santeLabel(Map<String, dynamic> b) {
+  final m = Map<String, dynamic>.from(b['sante'] as Map);
+  final n = m.values.fold<int>(0, (a, v) => a + ((v ?? 0) as num).toInt());
+  return '$n/${7 * m.length}';
+}
 
 void openClose(BuildContext context, String sprint) => Navigator.of(context)
     .push(MaterialPageRoute(fullscreenDialog: true, builder: (_) => ClosePage(sprint)));
@@ -398,8 +401,8 @@ class BilanView extends StatelessWidget {
       if (b['sante'] is Map)
         Panel(margin: margin, header: const PanelHead('Santé', subtitle: 'À part des points du sprint'), children: [
           line('Santé', santeLabel(b)),
-          line('Santé physique', '${b['sante']['p']}/7'),
-          line('Santé mentale', '${b['sante']['m']}/7'),
+          for (final k in healthNames.entries)
+            if ((b['sante'] as Map).containsKey(k.key)) line(k.value, '${b['sante'][k.key]}/7'),
         ]),
     ]);
   }

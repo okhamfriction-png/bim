@@ -11,6 +11,15 @@ import 'models.dart';
 final store = Store();
 
 /// État de l'appli : backlog, blocs fixes, sauvegarde locale et synchro GitHub.
+/// Colonnes de la santé du jour : clé enregistrée → libellé.
+const healthNames = {
+  'p': 'Santé physique',
+  'm': 'Santé mentale',
+  'r': 'Réveil',
+  'l': 'Lecture',
+  't': 'Téléphone',
+};
+
 class Store extends ChangeNotifier {
   List<Task> tasks = [];
   Schedule schedule = Schedule();
@@ -324,7 +333,7 @@ class Store extends ChangeNotifier {
       'parked': pick('parking'),
       'dropped': pick('drop'),
       // Score santé de la semaine : gardé à côté, jamais ajouté aux points.
-      'sante': {'p': healthIn(s).$1, 'm': healthIn(s).$2},
+      'sante': healthIn(s),
     };
   }
 
@@ -921,7 +930,7 @@ class Store extends ChangeNotifier {
     if (e == null) {
       e = {
         'id': 'sante-$day', 'date': '', 'start': 0, 'label': '', 'blockId': null,
-        'cutEnd': null, 'rappel': true, 'done': true, 'sante': day, 'p': null, 'm': null,
+        'cutEnd': null, 'rappel': true, 'done': true, 'sante': day,
       };
       schedule.events.add(e);
     }
@@ -931,17 +940,21 @@ class Store extends ChangeNotifier {
     _saveSchedule();
   }
 
-  /// Cases tenues dans la semaine du sprint : (physique, mentale). 7 chacune au plus.
-  (int, int) healthIn(String sprint) {
+  /// Cases tenues dans la semaine du sprint, par colonne : 7 chacune au plus.
+  Map<String, int> healthIn(String sprint) {
     final d0 = dateOf(sprint);
-    var a = 0, b = 0;
+    final out = {for (final k in healthNames.keys) k: 0};
     for (var i = 0; i < 7; i++) {
       final d = ymd(DateTime(d0.year, d0.month, d0.day + i));
-      if (health(d, 'p') == true) a++;
-      if (health(d, 'm') == true) b++;
+      for (final k in healthNames.keys) {
+        if (health(d, k) == true) out[k] = out[k]! + 1;
+      }
     }
-    return (a, b);
+    return out;
   }
+
+  /// Total des cases tenues dans la semaine du sprint.
+  int healthTotal(String sprint) => healthIn(sprint).values.fold(0, (a, b) => a + b);
 
   /// Heure de fin choisie pour le bloc raccourci par une date ponctuelle.
   void setCut(Map<String, dynamic> event, int minutes) {
