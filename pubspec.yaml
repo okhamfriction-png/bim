@@ -45,6 +45,7 @@ dependencies:
   wakelock_plus: ^1.7.0
   qr: ^3.0.2
   share_plus: ^13.0.0
+  speech_to_text: ^7.4.0
 
 dev_dependencies:
   flutter_test:

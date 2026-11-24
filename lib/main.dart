@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'consignes.dart';
 import 'courses.dart';
+import 'dictee.dart';
 import 'kpi.dart';
 import 'liaison.dart';
 import 'liaison_code.dart';
@@ -132,6 +133,13 @@ class _ShellState extends State<Shell> {
         if (mounted) sheet(context, ReceiveLinkSheet(code: code));
       });
     }
+    // Ouvert par l'icône « Bim dictée » : le micro s'ouvre tout de suite.
+    DictationLaunch.listen(() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) openDictation(context);
+      });
+      WidgetsBinding.instance.scheduleFrame();
+    });
     _life = AppLifecycleListener(onResume: () {
       store.loadWidgetConfig();
       store.sync();
@@ -173,6 +181,11 @@ class _ShellState extends State<Shell> {
                               color: p.onAccent)),
                     ),
                     const Spacer(),
+                    IconButton(
+                      tooltip: 'Dicter une note, une tâche, des courses',
+                      onPressed: () => openDictation(context),
+                      icon: Icon(Icons.mic_rounded, color: p.ink),
+                    ),
                     IconButton(
                       tooltip: 'Tableau de bord',
                       onPressed: () => openKpi(context),

@@ -1,5 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Dictée : micro du téléphone ou d'un casque Bluetooth. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.BLUETOOTH"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
     <application
         android:label="Bim"
         android:name="${applicationName}"
@@ -26,6 +31,19 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Seconde icône « Bim dictée » : ouvre l'appli directement sur le micro. C'est elle qu'on
+             choisit pour la double pression de la touche latérale du téléphone. -->
+        <activity-alias
+            android:name=".Dictee"
+            android:targetActivity=".MainActivity"
+            android:exported="true"
+            android:label="Bim dictée"
+            android:icon="@mipmap/ic_launcher">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
         <activity
             android:name=".WidgetConfigActivity"
             android:exported="true"
@@ -58,6 +76,9 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService"/>
+        </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

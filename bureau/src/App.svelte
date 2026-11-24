@@ -7,6 +7,7 @@
   import Cloture from './lib/Cloture.svelte';
   import Historique from './lib/Historique.svelte';
   import Kpi from './lib/Kpi.svelte';
+  import Dictee from './lib/Dictee.svelte';
   import Lanes from './lib/Lanes.svelte';
   import Task from './lib/Task.svelte';
   import Agenda from './lib/Agenda.svelte';
@@ -43,6 +44,12 @@
   let showDone = $state(false);
   let closing = $state(null); // sprint en cours de clôture
   let history = $state(false);
+  let dictating = $state(false);
+  let toast = $state('');
+  function said(msg) {
+    toast = msg;
+    setTimeout(() => (toast = ''), 3500);
+  }
 
   $effect(() => {
     let t = app.ui.theme;
@@ -107,6 +114,7 @@
       <i></i>{app.sync === 'ok' ? 'Synchronisé' : app.sync === 'sync' ? 'Synchro…' : app.sync === 'error' ? 'Erreur de synchro' : 'Non relié'}
     </button>
     <a class="btn" href="../?mobile=1" title="L'appli complète, au format téléphone">Version mobile</a>
+    <button class="btn" onclick={() => (dictating = true)} title="Dicter une note, une tâche, des courses">🎤 Dicter</button>
     <button class="btn" onclick={() => (settings = true)}>Réglages</button>
   </header>
 
@@ -187,6 +195,8 @@
 {#if notice}<div class="notice" role="status">{notice}</div>{/if}
 {#if closing}<Cloture sprint={closing} close={() => (closing = null)} />{/if}
 {#if history}<Historique close={() => (history = false)} />{/if}
+{#if dictating}<Dictee close={() => (dictating = false)} done={said} />{/if}
+{#if toast}<div class="toast">{toast}</div>{/if}
 
 <style>
   .app { height: 100%; display: flex; flex-direction: column; }
@@ -204,6 +214,10 @@
   .bar { height: 6px; border-radius: 99px; background: var(--line); overflow: hidden; }
   .bar i { display: block; height: 100%; background: var(--ok); border-radius: 99px; transition: width .3s; }
   .grow { flex: 1; }
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 40; max-width: 80vw;
+    background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-weight: 700;
+  }
   .tabs { display: flex; gap: 2px; padding: 3px; background: var(--line); border-radius: 11px; }
   .tabs button { padding: 6px 13px; border-radius: 8px; font-size: 13.5px; font-weight: 800; color: var(--sub); }
   .tabs button.on { background: var(--card); color: var(--ink); }
