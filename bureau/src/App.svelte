@@ -87,6 +87,15 @@
   // Un sprint se clôture une fois commencé : celui en cours, ou un sprint passé resté ouvert.
   const closable = (s) => s <= thisMonday();
   const lastClosed = $derived(closedSprints()[0]);
+  // Le logo rafraîchit tout : il envoie et récupère les données, puis recharge la page.
+  let refreshing = $state(false);
+  async function refresh() {
+    refreshing = true;
+    try {
+      await sync();
+    } catch {}
+    location.reload();
+  }
   const warn = (s) => plannedIn(s) < targetOf(s) || p0In(s) > 3;
   const plan = (s) =>
     `Prévu ${plannedIn(s)} pts · cible ${targetOf(s)}` +
@@ -97,7 +106,8 @@
 
 <div class="app">
   <header>
-    <span class="logo">bim</span>
+    <button class="logo" class:spin={refreshing} onclick={refresh} disabled={refreshing}
+      title="Synchroniser puis recharger toute la page" aria-label="Rafraîchir Bim">bim <i>↻</i></button>
     <span class="date">{fmtDate.format(now)}</span>
     <div class="value" title="Points de valeur gagnés cette semaine">
       <span><b>{value}</b> / {target} pts <small>+{valueToday()} aujourd'hui</small></span>
@@ -217,8 +227,12 @@
   header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; }
   .logo {
     background: var(--accent); color: var(--on-accent); font-weight: 900; font-size: 18px;
-    padding: 3px 11px; border-radius: 9px; letter-spacing: -.5px;
+    padding: 3px 11px; border-radius: 9px; letter-spacing: -.5px; display: inline-flex; align-items: center; gap: 6px;
   }
+  .logo i { font-style: normal; font-size: 15px; display: inline-block; }
+  .logo:hover i { transform: rotate(60deg); transition: transform .2s; }
+  .logo.spin i { animation: turn .7s linear infinite; }
+  @keyframes turn { to { transform: rotate(360deg); } }
   .date { font-weight: 800; font-size: 16px; text-transform: capitalize; }
   .value { min-width: 220px; display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; }
   .value b { font-size: 16px; }

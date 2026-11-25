@@ -75,14 +75,16 @@ class _SantePanelState extends State<SantePanel> {
     final d0 = dateOf(sprint);
     final today = ymd(DateTime.now());
     final total = store.healthTotal(sprint);
-    // Aujourd'hui hors de cette semaine : rien à replier sur le jour, on montre tout.
-    final inWeek = [for (var i = 0; i < 7; i++) ymd(_plus(d0, i))].contains(today);
+    // Replié : la veille seule (c'est elle qu'on remplit), même si elle tombe la semaine d'avant.
+    final n = DateTime.now();
+    final eve = DateTime(n.year, n.month, n.day - 1);
+    final rows = open ? [for (var i = 0; i < 7; i++) _plus(d0, i)] : [eve];
     return Panel(
       header: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => setState(() => open = !open),
         child: PanelHead('Santé du jour',
-            subtitle: 'Est-ce que j\'ai tenu ?',
+            subtitle: 'Est-ce que j\'ai tenu hier ?',
             icon: Icons.favorite_rounded,
             color: santeColor,
             count: 'Santé : $total/${7 * _keys.length}',
@@ -100,13 +102,11 @@ class _SantePanelState extends State<SantePanel> {
               ),
           ]),
         ),
-        for (var i = 0; i < 7; i++)
-          if (open || inWeek == false || ymd(_plus(d0, i)) == today)
+        for (final day in rows)
           Builder(builder: (context) {
-            final day = _plus(d0, i);
             final d = ymd(day);
             final future = d.compareTo(today) > 0;
-            final now = d == today;
+            final now = d == ymd(eve); // la ligne en évidence : la veille
             return Opacity(
               opacity: future ? .35 : 1,
               child: Container(
@@ -115,7 +115,7 @@ class _SantePanelState extends State<SantePanel> {
                 child: Row(children: [
                   SizedBox(
                     width: 62,
-                    child: Text('${_short[i]} ${day.day}',
+                    child: Text('${_short[day.weekday - 1]} ${day.day}',
                         style: TextStyle(
                             fontSize: 14.5,
                             fontWeight: now ? FontWeight.w900 : FontWeight.w600,

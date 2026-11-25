@@ -8,27 +8,29 @@
   const today = $derived(ymd(new Date(app.now)));
   const days = $derived(Array.from({ length: 7 }, (_, i) => addDays(dateOf(sprint), i)));
   const score = $derived(healthTotal(sprint));
-  // Replié par défaut : seule la ligne du jour. Un clic sur l'en-tête montre la semaine.
+  // Replié par défaut : la veille seule (c'est elle qu'on remplit), même si elle tombe la semaine
+  // d'avant. Un clic sur l'en-tête montre la semaine.
   let open = $state(false);
-  const shown = $derived(open || !days.some((d) => ymd(d) === today) ? days : days.filter((d) => ymd(d) === today));
+  const eve = $derived(addDays(new Date(new Date(app.now).setHours(0, 0, 0, 0)), -1));
+  const shown = $derived(open ? days : [eve]);
+  const short = (day) => SHORT[(day.getDay() + 6) % 7];
 </script>
 
 <div class="sante">
   <button class="top" onclick={() => (open = !open)} aria-expanded={open}>
-    <div><b>❤️ Santé du jour</b> <span class="muted">— est-ce que j'ai tenu ?</span></div>
+    <div><b>❤️ Santé du jour</b> <span class="muted">— est-ce que j'ai tenu hier ?</span></div>
     <span class="count">Santé : {score}/{7 * KEYS.length} {open ? '▾' : '▸'}</span>
   </button>
   <div class="line head"><span></span>{#each KEYS as [, name, , icon]}<span class="ico" title={name} role="img" aria-label={name}>{icon}</span>{/each}</div>
   {#each shown as day}
-    {@const i = days.indexOf(day)}
     {@const d = ymd(day)}
-    <div class="line" class:now={d === today} class:future={d > today}>
-      <span class="day">{SHORT[i]} {day.getDate()}</span>
+    <div class="line" class:now={d === ymd(eve)} class:future={d > today}>
+      <span class="day">{short(day)} {day.getDate()}</span>
       {#each KEYS as [k, name, color]}
         {@const v = health(d, k)}
         <span>
           <button class="box" style="--c: {color}" class:yes={v === true} class:no={v === false} disabled={d > today}
-            aria-label="{name}, {SHORT[i]} {day.getDate()} : {v === true ? 'tenu' : v === false ? 'pas tenu' : 'pas renseigné'}"
+            aria-label="{name}, {short(day)} {day.getDate()} : {v === true ? 'tenu' : v === false ? 'pas tenu' : 'pas renseigné'}"
             onclick={() => cycleHealth(d, k)}>{v === true ? '✓' : v === false ? '✕' : ''}</button>
         </span>
       {/each}

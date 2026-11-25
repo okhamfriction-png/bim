@@ -6,3 +6,6 @@ void clearUrlFragment() {
   final h = web.window.history, l = web.window.location;
   h.replaceState(h.state, '', '${l.pathname}${l.search}');
 }
+
+/// Recharge toute la page (bouton du logo).
+void reloadPage() => web.window.location.reload();

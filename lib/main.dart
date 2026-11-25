@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'consignes.dart';
@@ -121,6 +122,7 @@ class Shell extends StatefulWidget {
 
 class _ShellState extends State<Shell> {
   int tab = 0;
+  bool refreshing = false; // le logo synchronise puis recharge
   late final AppLifecycleListener _life;
 
   @override
@@ -171,16 +173,43 @@ class _ShellState extends State<Shell> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 10, 8, 6),
                   child: Row(children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
-                      decoration: BoxDecoration(
-                          color: p.accent, borderRadius: BorderRadius.circular(10)),
-                      child: Text('bim',
-                          style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -.5,
-                              color: p.onAccent)),
+                    // Le logo rafraîchit tout : synchro, puis rechargement de la page sur le web.
+                    Tooltip(
+                      message: 'Rafraîchir Bim',
+                      child: GestureDetector(
+                        onTap: refreshing
+                            ? null
+                            : () async {
+                                HapticFeedback.mediumImpact();
+                                setState(() => refreshing = true);
+                                try {
+                                  await store.sync();
+                                } catch (_) {}
+                                reloadPage();
+                                if (mounted) setState(() => refreshing = false);
+                              },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+                          decoration: BoxDecoration(
+                              color: p.accent, borderRadius: BorderRadius.circular(10)),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            Text('bim',
+                                style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: -.5,
+                                    color: p.onAccent)),
+                            const SizedBox(width: 6),
+                            refreshing
+                                ? SizedBox(
+                                    width: 15,
+                                    height: 15,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2.4, color: p.onAccent))
+                                : Icon(Icons.refresh_rounded, size: 18, color: p.onAccent),
+                          ]),
+                        ),
+                      ),
                     ),
                     const Spacer(),
                     IconButton(
