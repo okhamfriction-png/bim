@@ -924,7 +924,7 @@ class Store extends ChangeNotifier {
 
   bool? health(String day, String k) => _healthOf(day)?[k] as bool?;
 
-  /// Un appui : vide → tenu → pas tenu → vide.
+  /// Un appui coche la case, un autre la décoche.
   void cycleHealth(String day, String k) {
     var e = _healthOf(day);
     if (e == null) {
@@ -935,7 +935,7 @@ class Store extends ChangeNotifier {
       schedule.events.add(e);
     }
     final v = e[k];
-    e[k] = v == null ? true : (v == true ? false : null);
+    e[k] = v == true ? null : true; // coché ou pas coché, rien d'autre
     e['at'] = nowMs();
     _saveSchedule();
   }

@@ -159,7 +159,7 @@ export function santeKpi() {
   for (const [d, n] of Object.entries(rue)) {
     const v = health(d, 'm');
     if (v === true) held.push(n);
-    if (v === false) missed.push(n);
+    if (v !== true) missed.push(n);
   }
   const avg = (l) => (l.length ? l.reduce((a, b) => a + b, 0) / l.length : 0);
   k.rue = { held: [held.length, avg(held)], missed: [missed.length, avg(missed)] };

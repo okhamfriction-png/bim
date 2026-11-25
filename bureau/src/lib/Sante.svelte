@@ -18,7 +18,7 @@
 
 <div class="sante">
   <button class="top" onclick={() => (open = !open)} aria-expanded={open}>
-    <div><b>❤️ Santé du jour</b> <span class="muted">— est-ce que j'ai tenu hier ?</span></div>
+    <div><b>🌱 Santé du jour</b></div>
     <span class="count">Santé : {score}/{7 * KEYS.length} {open ? '▾' : '▸'}</span>
   </button>
   <div class="line head"><span></span>{#each KEYS as [, name, , icon]}<span class="ico" title={name} role="img" aria-label={name}>{icon}</span>{/each}</div>
@@ -29,9 +29,9 @@
       {#each KEYS as [k, name, color]}
         {@const v = health(d, k)}
         <span>
-          <button class="box" style="--c: {color}" class:yes={v === true} class:no={v === false} disabled={d > today}
-            aria-label="{name}, {short(day)} {day.getDate()} : {v === true ? 'tenu' : v === false ? 'pas tenu' : 'pas renseigné'}"
-            onclick={() => cycleHealth(d, k)}>{v === true ? '✓' : v === false ? '✕' : ''}</button>
+          <button class="box" style="--c: {color}" class:yes={v === true} disabled={d > today}
+            aria-label="{name}, {short(day)} {day.getDate()} : {v === true ? 'coché' : 'pas coché'}"
+            onclick={() => cycleHealth(d, k)}>{v === true ? '✓' : ''}</button>
         </span>
       {/each}
     </div>
@@ -47,11 +47,10 @@
   .line .day { text-align: left; font-weight: 600; }
   .head { font-size: 12.5px; font-weight: 800; color: var(--sub); padding-top: 8px; }
   .ico { font-size: 22px; line-height: 1; }
-  .now { background: color-mix(in srgb, #ec4899 10%, transparent); }
+  .now { background: color-mix(in srgb, #22c55e 10%, transparent); }
   .now .day { font-weight: 900; }
   .future { opacity: .35; }
   .box { width: 30px; height: 30px; border-radius: 9px; border: 2px solid var(--line); font-weight: 900; font-size: 16px; line-height: 1; }
   .box:disabled { cursor: default; }
   .box.yes { background: var(--c); border-color: var(--c); color: #fff; }
-  .box.no { border-color: var(--p0); color: var(--p0); background: color-mix(in srgb, var(--p0) 14%, transparent); }
 </style>

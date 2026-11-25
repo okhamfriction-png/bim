@@ -432,7 +432,7 @@ export function remindersNow() {
 const healthOf = (day) => (sched().events ?? []).find((e) => e.sante === day && !e.deleted);
 export const health = (day, k) => healthOf(day)?.[k] ?? null;
 export const healthDays = () => (sched().events ?? []).filter((e) => e.sante && !e.deleted).map((e) => e.sante).sort();
-/** Un appui : vide → tenu → pas tenu → vide. */
+/** Un appui coche la case, un autre la décoche. */
 export function cycleHealth(day, k) {
   const sc = (app.doc.schedule ??= {});
   let e = healthOf(day);
@@ -444,12 +444,12 @@ export function cycleHealth(day, k) {
     e = sc.events.at(-1);
   }
   const v = e[k] ?? null;
-  e[k] = v === null ? true : v === true ? false : null;
+  e[k] = v === true ? null : true; // coché ou pas coché, rien d'autre
   touchReminder(e);
 }
 /** Colonnes de la santé du jour : [clé enregistrée, libellé, couleur, icône de la colonne]. */
 export const HEALTH = [
-  ['p', 'Santé physique', '#22c55e', '❤️'],
+  ['p', 'Santé physique', '#22c55e', '💚'],
   ['m', 'Santé mentale', '#8b5cf6', '🧠'],
   ['r', 'Réveil', '#f59e0b', '⏰'],
   ['l', 'Lecture', '#0ea5e9', '📖'],

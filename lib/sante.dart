@@ -8,7 +8,7 @@ import 'models.dart';
 import 'store.dart';
 import 'ui.dart';
 
-const santeColor = Color(0xFFEC4899);
+const santeColor = Color(0xFF22C55E);
 const santeP = Color(0xFF22C55E); // physique
 const santeM = Color(0xFF8B5CF6); // mentale
 // Colonnes : (clé, libellé, couleur, icône affichée en tête de colonne).
@@ -23,7 +23,7 @@ const _short = ['Lun.', 'Mar.', 'Mer.', 'Jeu.', 'Ven.', 'Sam.', 'Dim.'];
 
 DateTime _plus(DateTime d, int n) => DateTime(d.year, d.month, d.day + n);
 
-/// Une case à trois états : tenu, pas tenu, pas renseigné.
+/// Une case : cochée (tenu) ou pas. Une ancienne case « pas tenu » s'affiche comme vide.
 class _Box extends StatelessWidget {
   final bool? value;
   final Color color;
@@ -32,7 +32,7 @@ class _Box extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
-    final c = value == true ? color : (value == false ? prioColors[0] : p.line);
+    final on = value == true;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
@@ -43,13 +43,10 @@ class _Box extends StatelessWidget {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-                color: value == true ? c : (value == false ? c.withValues(alpha: .14) : null),
+                color: on ? color : null,
                 borderRadius: BorderRadius.circular(9),
-                border: Border.all(color: c, width: 2)),
-            child: value == null
-                ? null
-                : Icon(value! ? Icons.check_rounded : Icons.close_rounded,
-                    size: 21, color: value! ? Colors.white : c),
+                border: Border.all(color: on ? color : p.line, width: 2)),
+            child: on ? const Icon(Icons.check_rounded, size: 21, color: Colors.white) : null,
           ),
         ),
       ),
@@ -84,9 +81,8 @@ class _SantePanelState extends State<SantePanel> {
         behavior: HitTestBehavior.opaque,
         onTap: () => setState(() => open = !open),
         child: PanelHead('Santé du jour',
-            subtitle: 'Est-ce que j\'ai tenu hier ?',
-            icon: Icons.favorite_rounded,
-            color: santeColor,
+            icon: Icons.spa_rounded,
+            color: santeP,
             count: 'Santé : $total/${7 * _keys.length}',
             trailing: Icon(open ? Icons.expand_less_rounded : Icons.expand_more_rounded,
                 color: p.sub)),
@@ -216,7 +212,7 @@ class SanteKpi {
     rue.forEach((d, n) {
       final v = store.health(d, 'm');
       if (v == true) held.add(n);
-      if (v == false) missed.add(n);
+      if (v != true) missed.add(n);
     });
     double avg(List<int> l) => l.isEmpty ? 0 : l.reduce((a, b) => a + b) / l.length;
     rueHeld = (held.length, avg(held));
@@ -257,8 +253,8 @@ class SanteKpiView extends StatelessWidget {
       Panel(
         header: const PanelHead('Santé',
             subtitle: 'Jours tenus sur 7, par semaine',
-            icon: Icons.favorite_rounded,
-            color: santeColor),
+            icon: Icons.spa_rounded,
+            color: santeP),
         children: [
           row([
             cell('Sem.', color: p.sub, align: TextAlign.left),

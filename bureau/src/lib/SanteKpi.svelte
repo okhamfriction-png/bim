@@ -15,7 +15,7 @@
 </script>
 
 <div class="box">
-  <h4>❤️ Santé <small>Jours tenus sur 7, par semaine</small></h4>
+  <h4>🌱 Santé <small>Jours tenus sur 7, par semaine</small></h4>
   <div class="grid wide head"><span>Semaine du</span>{#each KEYS as [, name, , icon]}<span class="ico" title={name} role="img" aria-label={name}>{icon}</span>{/each}<span>Tous</span></div>
   {#each k.mondays.toReversed() as mo, r}
     {@const i = k.mondays.length - 1 - r}
@@ -62,7 +62,7 @@
   .grid > :first-child { text-align: left; }
   .grid.head { font-size: 12.5px; font-weight: 800; color: var(--sub); }
   .ico { font-size: 18px; line-height: 1; }
-  .grid.now { background: color-mix(in srgb, #ec4899 8%, transparent); }
+  .grid.now { background: color-mix(in srgb, #22c55e 8%, transparent); }
   .grid.now > :first-child { font-weight: 800; }
   svg { display: block; width: 100%; padding: 12px 12px 4px; }
   .axis { stroke: var(--line); }

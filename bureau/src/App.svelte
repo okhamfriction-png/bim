@@ -149,7 +149,7 @@
             <div class="bar"><i style="width: {target ? Math.min(100, (100 * value) / target) : 0}%"></i></div>
             <small>+{valueToday()} aujourd'hui · reste {Math.max(0, target - value)} pour la cible</small>
           </div>
-          <span class="chip">❤️ Santé {sante}/{7 * HEALTH.length}</span>
+          <span class="chip">🌱 Santé {sante}/{7 * HEALTH.length}</span>
         </div>
         {#if lastClosed}
           <div class="sub closed">
@@ -276,7 +276,7 @@
   .score .track .bar { height: 10px; border-radius: 99px; background: var(--line); overflow: hidden; }
   .score .track .bar i { display: block; height: 100%; border-radius: 99px; background: var(--ok); transition: width .6s ease; }
   .score small { color: var(--sub); font-size: 12.5px; }
-  .score .chip { font-weight: 800; font-size: 13.5px; white-space: nowrap; padding: 5px 10px; border-radius: 99px; border: 1px solid var(--line); }
+  .score .chip { color: var(--ink); font-weight: 800; font-size: 13.5px; white-space: nowrap; padding: 5px 10px; border-radius: 99px; border: 1px solid var(--line); }
   @keyframes bump { 0% { transform: scale(1.5); } 100% { transform: scale(1); } }
   .scroll { overflow: auto; flex: 1; min-height: 0; }
   .sub {
