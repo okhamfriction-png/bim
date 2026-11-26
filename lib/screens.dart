@@ -1005,6 +1005,8 @@ class _TileState extends State<_Tile> {
                       () => sheet(context, SprintSheet(t))),
                 action('Modifier', Icons.edit_outlined,
                     () => sheet(context, TaskSheet(task: t))),
+                action('Dupliquer', Icons.copy_rounded,
+                    () => sheet(context, TaskSheet(task: store.duplicate(t)))),
               ]),
             ]),
           ),

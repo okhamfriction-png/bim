@@ -502,6 +502,15 @@ class _TaskSheetState extends State<TaskSheet> {
       Row(children: [
         if (t != null)
           IconButton(
+              tooltip: 'Dupliquer',
+              onPressed: () {
+                final c = store.duplicate(t);
+                Navigator.pop(context);
+                sheet(context, TaskSheet(task: c));
+              },
+              icon: const Icon(Icons.copy_rounded)),
+        if (t != null)
+          IconButton(
               tooltip: 'Supprimer',
               onPressed: () {
                 store.remove(t);

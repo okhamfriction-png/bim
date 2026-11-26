@@ -853,6 +853,28 @@ class Store extends ChangeNotifier {
     touch(t);
   }
 
+  /// Copie une tâche, rangée juste après l'originale : même contenu, à refaire.
+  /// Les résultats ne sont pas repris (cases décochées, pas de date de fin, pas de report).
+  Task duplicate(Task t) {
+    final c = Task.fromJson({...t.toJson(), 'id': newId()})
+      ..title = '${t.title} (copie)'
+      ..status = 'todo'
+      ..doneAt = null
+      ..pickedOn = null
+      ..archived = false
+      ..deleted = false
+      ..result = ''
+      ..createdAt = nowMs()
+      ..updatedAt = nowMs()
+      ..subs = [for (final s in t.subs) Sub(s.title)]
+      ..rank = t.rank + .5;
+    c.meta.remove('reports');
+    c.meta.remove('reporteDe');
+    tasks.add(c);
+    _changed();
+    return c;
+  }
+
   void remove(Task t) {
     t.deleted = true;
     touch(t);

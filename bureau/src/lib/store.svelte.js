@@ -626,6 +626,33 @@ export function removeSub(t, s) {
   settle(t);
   touch(t);
 }
+/** Copie une tâche, rangée juste après l'originale : même contenu, à refaire.
+ *  Les résultats ne sont pas repris (cases décochées, pas de date de fin, pas de report). */
+export function duplicate(t) {
+  const now = Date.now();
+  const c = {
+    ...structuredClone($state.snapshot(t)),
+    id: newId(),
+    title: `${t.title} (copie)`,
+    status: 'todo',
+    doneAt: null,
+    pickedOn: null,
+    archived: false,
+    deleted: false,
+    createdAt: now,
+    updatedAt: now,
+    rank: (t.rank ?? 0) + 0.5,
+  };
+  delete c.result;
+  if (c.meta) {
+    delete c.meta.reports;
+    delete c.meta.reporteDe;
+  }
+  if (c.subs) c.subs = c.subs.map((s) => ({ title: s.title, done: false }));
+  app.doc.tasks.push(c);
+  changed();
+  return c;
+}
 export function remove(t) {
   t.deleted = true;
   touch(t);

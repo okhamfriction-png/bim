@@ -1,7 +1,7 @@
 <script>
   import {
     PRIO, CATS, KINDS, iconOf, pointsLabel, unitsLabel, sprints, dateOf, catOf,
-    complete, reopen, toggleSub, addSub, removeSub, renameSub, remove, touch, whole, setPrise, priseSummary, noted, kindOf, BLOCK_FIELDS, blockSummary, hasData, setSubField,
+    complete, reopen, toggleSub, addSub, removeSub, renameSub, duplicate, remove, touch, whole, setPrise, priseSummary, noted, kindOf, BLOCK_FIELDS, blockSummary, hasData, setSubField,
   } from './store.svelte.js';
 
   let { t, drag = true } = $props();
@@ -146,6 +146,7 @@
         </label>
       </div>
       <div class="actions">
+        <button class="btn" onclick={() => duplicate(t)} title="Créer une copie de cette tâche">Dupliquer</button>
         <button class="btn" onclick={() => remove(t)}>Supprimer</button>
         <button class="btn" onclick={() => (open = false)}>Fermer</button>
       </div>
